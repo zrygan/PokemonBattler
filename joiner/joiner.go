@@ -49,7 +49,6 @@ func main() {
 		// check if this is a HandshakeResponse
 		// then create a BattleSetup once done
 		if msg.MessageType == messages.HandshakeResponse {
-
 		}
 	}
 }
