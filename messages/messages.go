@@ -15,31 +15,42 @@ const (
 	HandshakeResponse = "HANDSHAKE_RESPONSE"
 )
 
+// SerializeMessage converts a Message to bytes
 func (m *Message) SerializeMessage() []byte {
-	var sm []byte
-	sm = append(sm, fmt.Appendf(nil, "message_type: %s", m.MessageType)...)
+	var sb strings.Builder
 
+	sb.WriteString(fmt.Sprintf("message_type: %s\n", m.MessageType))
 	if m.MessageParams != nil {
 		for k, v := range *m.MessageParams {
-			sm = append(sm, fmt.Appendf(nil, "%s: %s", k, v)...)
+			sb.WriteString(fmt.Sprintf("%s: %s\n", k, v))
 		}
 	}
 
-	return sm
+	return []byte(sb.String())
 }
 
 func DeserializeMessage(bs []byte) *Message {
-	msg := new(Message)
-	s := string(bs)
-	// first split it by space
-	sArr := strings.Split(s, " ")
+	msg := &Message{
+		MessageParams: &map[string]string{},
+	}
 
-	// the type will alwyas be the 2nd element in sArr
-	msg.MessageType = sArr[1]
+	lines := strings.Split(string(bs), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
 
-	switch msg.MessageType {
-	case HandshakeRequest:
-		msg.MessageParams = nil
+		parts := strings.SplitN(line, ": ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key, value := parts[0], parts[1]
+		if key == "message_type" {
+			msg.MessageType = value
+		} else {
+			(*msg.MessageParams)[key] = value
+		}
 	}
 
 	return msg
