@@ -14,10 +14,21 @@ func main() {
 
 	buf := make([]byte, 1024)
 	for {
-		n, remoteAddr, _ := conn.ReadFromUDP(buf)
-		msg := buf[:n]
-		des := messages.DeserializeMessage(msg)
+		n, addr, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			panic(err)
+		}
 
-		fmt.Println("Received from joiner:", des.MessageType, "from", remoteAddr)
+		bc := buf[:n]
+		des := messages.DeserializeMessage(bc)
+		fmt.Println("Received: ", des.MessageType, des.MessageParams)
+
+		if des.MessageType == messages.HandshakeRequest {
+			// then send back a HandshakeResponse
+			msg := messages.MakeHandshakeResponse()
+			conn.WriteToUDP(msg.SerializeMessage(), addr)
+			fmt.Println("Sent: ", msg.MessageType, msg.MessageParams)
+		}
+
 	}
 }

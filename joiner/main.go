@@ -13,20 +13,20 @@ func main() {
 	defer conn.Close()
 
 	// send a HandshakeRequest to the Host (if there is?)
-	msg := messages.Message{
-		MessageType:   messages.HandshakeRequest,
-		MessageParams: nil, // Request has no Params
-	}
-
+	msg := messages.MakeHandshakeRequest()
+	fmt.Println("Sent: ", msg.MessageType, msg.MessageParams)
 	conn.Write(msg.SerializeMessage())
 
 	buf := make([]byte, 1024)
 	for {
-		n, remoteAddr, err := conn.ReadFromUDP(buf)
+		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			fmt.Println("Read error:", err)
-			continue
+			panic(err)
 		}
-		fmt.Println("this sould not run", string(buf[:n]), "from", remoteAddr)
+
+		bc := buf[:n]
+		des := messages.DeserializeMessage(bc)
+
+		fmt.Println("Received: ", des.MessageType, des.MessageParams)
 	}
 }
