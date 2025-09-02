@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/zrygan/pokemonbattler/helper"
+	"github.com/zrygan/pokemonbattler/messages"
 )
 
 func main() {
@@ -14,8 +15,9 @@ func main() {
 	buf := make([]byte, 1024)
 	for {
 		n, remoteAddr, _ := conn.ReadFromUDP(buf)
-		fmt.Printf("Got from %s: %s\n", remoteAddr, string(buf[:n]))
+		msg := buf[:n]
+		des := messages.DeserializeMessage(msg)
 
-		conn.WriteToUDP([]byte("hello! this is my response!"), remoteAddr)
+		fmt.Println("Received from joiner:", des.MessageType, "from", remoteAddr)
 	}
 }

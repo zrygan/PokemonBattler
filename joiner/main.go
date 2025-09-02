@@ -5,18 +5,28 @@ import (
 	"os"
 
 	"github.com/zrygan/pokemonbattler/helper"
+	"github.com/zrygan/pokemonbattler/messages"
 )
 
 func main() {
 	_, conn := helper.JoinTo(os.Args)
 	defer conn.Close()
 
-	msg := []byte("hello via udp")
-	conn.Write(msg)
-	msg = []byte("okay bye now!")
-	conn.Write(msg)
+	// send a HandshakeRequest to the Host (if there is?)
+	msg := messages.Message{
+		MessageType:   messages.HandshakeRequest,
+		MessageParams: nil, // Request has no Params
+	}
+
+	conn.Write(msg.SerializeMessage())
 
 	buf := make([]byte, 1024)
-	n, _, _ := conn.ReadFromUDP(buf)
-	fmt.Println("Server replied:", string(buf[:n]))
+	for {
+		n, remoteAddr, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			fmt.Println("Read error:", err)
+			continue
+		}
+		fmt.Println("this sould not run", string(buf[:n]), "from", remoteAddr)
+	}
 }
