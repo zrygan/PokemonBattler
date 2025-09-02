@@ -7,12 +7,13 @@ import (
 
 type Message struct {
 	MessageType   string
-	MessageParams *map[string]string
+	MessageParams *map[string]any
 }
 
 const (
 	HandshakeRequest  = "HANDSHAKE_REQUEST"
 	HandshakeResponse = "HANDSHAKE_RESPONSE"
+	BattleSetup       = "BATTLE_SETUP"
 )
 
 // SerializeMessage converts a Message to bytes
@@ -30,8 +31,9 @@ func (m *Message) SerializeMessage() []byte {
 }
 
 func DeserializeMessage(bs []byte) *Message {
+
 	msg := &Message{
-		MessageParams: &map[string]string{},
+		MessageParams: &map[string]any{},
 	}
 
 	lines := strings.Split(string(bs), "\n")
