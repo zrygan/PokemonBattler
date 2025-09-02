@@ -2,15 +2,13 @@ package main
 
 import (
 	"fmt"
-	"net"
+	"os"
+
+	"github.com/zrygan/pokemonbattler/helper"
 )
 
 func main() {
-	serverAddr := net.UDPAddr{
-		Port: 5005,
-		IP:   net.ParseIP("127.0.0.1"),
-	}
-	conn, _ := net.DialUDP("udp", nil, &serverAddr)
+	_, conn := helper.JoinTo(os.Args)
 	defer conn.Close()
 
 	msg := []byte("hello via udp")
