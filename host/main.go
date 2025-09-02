@@ -21,13 +21,28 @@ func main() {
 
 		bc := buf[:n]
 		des := messages.DeserializeMessage(bc)
-		fmt.Println("Received: ", des.MessageType, des.MessageParams)
+
+		helper.VerboseEventLog(
+			"A message was RECEIVED",
+			&helper.LogOptions{
+				MT: des.MessageType,
+				MP: fmt.Sprint(*des.MessageParams),
+				MS: addr.String(),
+			},
+		)
 
 		if des.MessageType == messages.HandshakeRequest {
 			// then send back a HandshakeResponse
 			msg := messages.MakeHandshakeResponse()
 			conn.WriteToUDP(msg.SerializeMessage(), addr)
-			fmt.Println("Sent: ", msg.MessageType, msg.MessageParams)
+
+			helper.VerboseEventLog(
+				"A message was SENT",
+				&helper.LogOptions{
+					MT: msg.MessageType,
+					MP: fmt.Sprint(*msg.MessageParams),
+				},
+			)
 		}
 
 	}
