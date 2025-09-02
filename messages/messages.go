@@ -2,6 +2,7 @@ package messages
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ func (m *Message) SerializeMessage() []byte {
 	sb.WriteString(fmt.Sprintf("message_type: %s\n", m.MessageType))
 	if m.MessageParams != nil {
 		for k, v := range *m.MessageParams {
-			sb.WriteString(fmt.Sprintf("%s: %s\n", k, v))
+			sb.WriteString(fmt.Sprintf("%s: %v\n", k, v))
 		}
 	}
 
@@ -36,8 +37,8 @@ func DeserializeMessage(bs []byte) *Message {
 		MessageParams: &map[string]any{},
 	}
 
-	lines := strings.Split(string(bs), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(bs), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -50,9 +51,15 @@ func DeserializeMessage(bs []byte) *Message {
 		key, value := parts[0], parts[1]
 		if key == "message_type" {
 			msg.MessageType = value
+		}
+
+		// check if the value is a numeric type
+		if numValue, err := strconv.Atoi(value); err == nil {
+			(*msg.MessageParams)[key] = numValue
 		} else {
 			(*msg.MessageParams)[key] = value
 		}
+
 	}
 
 	return msg
