@@ -82,8 +82,8 @@ func main() {
 
 			helper.ShowMenu(
 				"Allocate stat boosts for your special attack and defense!",
-				"Format is 2 integers <attack_boost> <defense_boost>",
-				"The two integers must sum to 10",
+				"\nFormat is 2 integers <attack_boost> <defense_boost>",
+				"\nThe two integers must sum to 10",
 			)
 
 			sb := new(game.StatBoosts)
