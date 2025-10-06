@@ -14,13 +14,13 @@ type PeerDescriptor struct {
 }
 
 func MakePDFromLogin(userType string) PeerDescriptor {
-	pd := MakePDBase(netio.Login())
+	pd := MakePDBase(netio.Login(userType))
 
 	netio.VerboseEventLog(
 		"A new "+userType+" connected.",
 		&netio.LogOptions{
 			Port: strconv.Itoa(pd.Addr.Port),
-			IP:   string(pd.Addr.IP),
+			IP:   pd.Addr.IP.String(),
 		},
 	)
 
