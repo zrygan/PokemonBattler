@@ -11,7 +11,7 @@ import (
 	"github.com/zrygan/pokemonbattler/peer"
 )
 
-func lookForJoinables(udp *net.UDPAddr) map[string]string {
+func lookForMatch() map[string]string {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		panic(err)
@@ -25,7 +25,8 @@ func lookForJoinables(udp *net.UDPAddr) map[string]string {
 	}
 
 	// send the broadcast message
-	_, err = conn.WriteToUDP([]byte(messages.MMB_JOINING), &bAddr)
+	msg := messages.MakeJoiningMMB()
+	_, err = conn.WriteToUDP(msg.SerializeMessage(), &bAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -73,32 +74,7 @@ func lookForJoinables(udp *net.UDPAddr) map[string]string {
 	return discoveredHosts
 }
 
-func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
-	// send a HandshakeRequest to the Host
-	msg := messages.MakeHandshakeRequest()
-
-	netio.VerboseEventLog(
-		"Inviting "+host.Name+", sent a "+messages.HandshakeRequest+" message",
-		&netio.LogOptions{
-			MT: msg.MessageType,
-		},
-	)
-
-	// send the handshake to host address
-	_, err := self.Conn.WriteToUDP(msg.SerializeMessage(), host.Addr)
-	if err != nil {
-		panic(err)
-	}
-
-	// wait for host response
-}
-
-func main() {
-	self := peer.MakePDFromLogin("joiner")
-	defer self.Conn.Close()
-
-	hosts := lookForJoinables(self.Addr)
-
+func selectMatch(hosts map[string]string) peer.PeerDescriptor {
 	// once all joinable are found, ask which one to join/Handshake
 	// stores [ip, port] of invited
 	var hostDets []string = nil
@@ -113,8 +89,33 @@ func main() {
 		}
 	}
 
-	host := peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+	return peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+}
 
-	// once host is found, init a handshake
-	handshake(self, host)
+func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
+	// send a HandshakeRequest to the Host
+	msg := messages.MakeHandshakeRequest(self.Name)
+
+	netio.VerboseEventLog(
+		"Inviting "+host.Name+", sent a "+messages.HandshakeRequest+" message",
+		&netio.LogOptions{
+			MT:            msg.MessageType,
+			MessageParams: msg.MessageParams,
+		},
+	)
+
+	// send the handshake to host address
+	_, err := self.Conn.WriteToUDP(msg.SerializeMessage(), host.Addr)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	self := peer.MakePDFromLogin("joiner")
+	defer self.Conn.Close()
+
+	availableHosts := lookForMatch()
+	matchedHost := selectMatch(availableHosts)
+	handshake(self, matchedHost)
 }
