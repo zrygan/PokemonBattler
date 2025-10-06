@@ -46,6 +46,9 @@ func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
 				res.SerializeMessage(),
 				rem,
 			)
+
+		// if somebody is asking to handshake
+		// return the peer descriptor of the joiner if you accepted it
 		case messages.HandshakeRequest:
 			name, nameOK := (*msg.MessageParams)["name"].(string)
 			if nameOK {
