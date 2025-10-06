@@ -21,14 +21,14 @@ func Login() (string, string, string) {
 	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")
 	fmt.Println()
 
-	name := ReadLine("What is your trainer name?")
+	name := PRLine("What is your trainer name?")
 
-	port := ReadLine("Choose your port?")
+	port := PRLine("Choose your port?")
 	if port == "" {
 		port = "50000"
 	}
 
-	ip := ReadLine("Choose your IP?")
+	ip := PRLine("Choose your IP?")
 	if ip == "" {
 		ip = getLocalIP()
 	}
