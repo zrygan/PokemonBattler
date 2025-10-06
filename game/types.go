@@ -3,16 +3,19 @@ package game
 import "net"
 
 type User struct {
-	Conn          *net.UDPConn
-	Addr          *net.UDPAddr
+	PD            PeerDescriptor
 	GameStruct    *Game
 	PokemonStruct *Pokemon
 	UserType      UserTypeEnum
 }
 
+type PeerDescriptor struct {
+	Name string
+	Conn *net.UDPConn
+	Addr *net.UDPAddr // has Port and IP
+}
+
 type Game struct {
-	IP                string
-	Port              string
 	Seed              int
 	CommunicationMode CommunicationModeEnum
 }
@@ -40,3 +43,5 @@ const (
 	P2P CommunicationModeEnum = iota
 	Broadcast
 )
+
+const DiscoveryPort = 50000

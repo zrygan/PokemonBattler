@@ -15,7 +15,7 @@ func ShowMenu(texts ...string) {
 
 func ReadLine() string {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\n$ ")
+	fmt.Print("$ ")
 	line, _ := reader.ReadString('\n')
 	return strings.TrimSpace(line)
 }

@@ -3,24 +3,74 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
+	"time"
 
+	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
 	"github.com/zrygan/pokemonbattler/netio"
 )
 
-func lookForJoinables() {
+func lookForJoinables(udp *net.UDPAddr) {
+	conn, err := net.ListenUDP("udp", nil)
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
 
-}
-
-func joinTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
-	if len(arguments) != 3 {
-		panic("arguments must be of the form: <port> <ip>")
+	// broadcast
+	bAddr := net.UDPAddr{
+		IP:   net.IPv4bcast,      // 255.255.255.255
+		Port: game.DiscoveryPort, // 50000
 	}
 
-	// no need for parsing these two since we need them as strings
-	port := arguments[1]
-	ip := arguments[2]
+	// send the broadcast message
+	_, err = conn.WriteToUDP([]byte(messages.MMB_JOINING), &bAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+
+	// make a map of discovered hosts
+	discoveredHosts := make(map[string]string)
+
+	for {
+		buf := make([]byte, 1024)
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			break
+			// panic(err)
+		}
+
+		msg := messages.DeserializeMessage(buf[:n])
+		if msg.MessageType == messages.MMB_HOSTING {
+			hostName := fmt.Sprint((*msg.MessageParams)["hostName"])
+			hostPort := fmt.Sprint((*msg.MessageParams)["port"])
+			hostIP := fmt.Sprint((*msg.MessageParams)["ip"])
+
+			netio.VerboseEventLog(
+				"Found a HOST, asked to join.",
+				&netio.LogOptions{
+					Name: hostName,
+					Port: hostPort,
+					IP:   hostIP,
+				},
+			)
+
+			hostDets := fmt.Sprintf("%s %s", hostIP, hostPort)
+
+			discoveredHosts[hostDets] = hostName
+		}
+	}
+
+	fmt.Println("Discovered Hosts")
+	for details, name := range discoveredHosts {
+		fmt.Printf("%s @ %s\n", name, details)
+	}
+}
+
+func joinTo() game.PeerDescriptor {
+	name, port, ip := netio.Login()
 
 	addr, err := net.ResolveUDPAddr("udp", ip+":"+port)
 	if err != nil {
@@ -40,19 +90,17 @@ func joinTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
 		},
 	)
 
-	return addr, conn
+	return game.PeerDescriptor{
+		Name: name,
+		Conn: conn,
+		Addr: addr,
+	}
 }
 
-func main() {
-	// a general variable for Message struct
-	var msg messages.Message
-
-	_, conn := joinTo(os.Args)
-	defer conn.Close()
-
+func handshakeHost(pd game.PeerDescriptor) {
 	// send a HandshakeRequest to the Host (if there is?)
-	msg = messages.MakeHandshakeRequest()
-	conn.Write(msg.SerializeMessage())
+	msg := messages.MakeHandshakeRequest()
+	pd.Conn.Write(msg.SerializeMessage())
 
 	netio.VerboseEventLog(
 		"A message was SENT",
@@ -63,7 +111,7 @@ func main() {
 
 	buf := make([]byte, 1024)
 	for {
-		n, addr, err := conn.ReadFromUDP(buf)
+		n, addr, err := pd.Conn.ReadFromUDP(buf)
 		if err != nil {
 			panic(err)
 		}
@@ -87,4 +135,11 @@ func main() {
 		if msg.MessageType == messages.HandshakeResponse {
 		}
 	}
+}
+
+func main() {
+	pd := joinTo()
+	defer pd.Conn.Close()
+
+	lookForJoinables(pd.Addr)
 }

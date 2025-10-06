@@ -7,6 +7,9 @@ import (
 const verbose bool = true
 
 type LogOptions struct {
+	// Name
+	Name string
+
 	// Port
 	Port string
 
