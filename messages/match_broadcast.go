@@ -1,6 +1,8 @@
 package messages
 
-import "net"
+import (
+	"github.com/zrygan/pokemonbattler/peer"
+)
 
 func MakeJoiningMMB() Message {
 	return Message{
@@ -9,11 +11,11 @@ func MakeJoiningMMB() Message {
 	}
 }
 
-func MakeHostingMMB(hostName string, udp *net.UDPAddr) Message {
+func MakeHostingMMB(pd peer.PeerDescriptor) Message {
 	params := map[string]any{
-		"hostName": hostName,
-		"ip":       udp.IP,
-		"port":     udp.Port,
+		"name": pd.Name,
+		"ip":   pd.Addr.IP.String(),
+		"port": pd.Addr.Port,
 	}
 
 	return Message{
