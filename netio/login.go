@@ -16,7 +16,7 @@ func getLocalIP() string {
 	return localAddr.IP.String()
 }
 
-func Login() (string, string, string) {
+func Login() (string, string, string, bool) {
 	fmt.Println("Welcome to PokeBattler")
 	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")
 	fmt.Println()
@@ -33,5 +33,6 @@ func Login() (string, string, string) {
 		ip = getLocalIP()
 	}
 
-	return name, ip, port
+	// false here is the remote checker in PD constructor functions
+	return name, ip, port, true
 }
