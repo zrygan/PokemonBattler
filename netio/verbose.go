@@ -42,7 +42,7 @@ func VerboseEventLog(
 				fmt.Printf("\t> Port: %s\n", opts.Port)
 			}
 			if opts.IP != "" {
-				fmt.Printf("\t> Addr: %s\n", opts.IP)
+				fmt.Printf("\t> IP: %s\n", opts.IP)
 			}
 			if opts.MT != "" {
 				fmt.Printf("\t> MessageType: %s\n", opts.MT)
