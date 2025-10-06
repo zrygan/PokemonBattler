@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -11,11 +12,48 @@ import (
 	"github.com/zrygan/pokemonbattler/messages"
 )
 
+// The parameter arguments is
+func hostTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
+	if len(arguments) != 3 {
+		panic("arguments must be of the form: <port> <ip>")
+	}
+
+	port, err := strconv.Atoi(arguments[1])
+	if err != nil {
+		panic(err)
+	}
+
+	ip := net.ParseIP(arguments[2])
+	if ip == nil {
+		panic("invalid IP address")
+	}
+
+	addr := &net.UDPAddr{
+		Port: port,
+		IP:   ip,
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		panic(err)
+	}
+
+	helper.VerboseEventLog(
+		"A new HOST connected.",
+		&helper.LogOptions{
+			Port: arguments[1],
+			IP:   arguments[2],
+		},
+	)
+
+	return addr, conn
+}
+
 func main() {
 	// a general variable for Message struct
 	var msg messages.Message
 
-	_, conn := helper.HostTo(os.Args)
+	_, conn := hostTo(os.Args)
 	defer conn.Close()
 
 	buf := make([]byte, 1024)

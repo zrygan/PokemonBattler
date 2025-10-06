@@ -2,17 +2,52 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/zrygan/pokemonbattler/helper"
 	"github.com/zrygan/pokemonbattler/messages"
 )
 
+func lookForJoinables() {
+
+}
+
+func joinTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
+	if len(arguments) != 3 {
+		panic("arguments must be of the form: <port> <ip>")
+	}
+
+	// no need for parsing these two since we need them as strings
+	port := arguments[1]
+	ip := arguments[2]
+
+	addr, err := net.ResolveUDPAddr("udp", ip+":"+port)
+	if err != nil {
+		panic(err)
+	}
+
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		panic(err)
+	}
+
+	helper.VerboseEventLog(
+		"A new JOINER connected.",
+		&helper.LogOptions{
+			Port: port,
+			IP:   ip,
+		},
+	)
+
+	return addr, conn
+}
+
 func main() {
 	// a general variable for Message struct
 	var msg messages.Message
 
-	_, conn := helper.JoinTo(os.Args)
+	_, conn := joinTo(os.Args)
 	defer conn.Close()
 
 	// send a HandshakeRequest to the Host (if there is?)
