@@ -19,7 +19,6 @@ func MakeHostingMMB(pd peer.PeerDescriptor) Message {
 	}
 
 	return Message{
-		MessageType:   MMB_HOSTING,
 		MessageParams: &params,
 	}
 }
