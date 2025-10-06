@@ -35,14 +35,15 @@ func main() {
 
 		// buffer content
 		bc := buf[:n]
-		msg = *messages.DeserializeMessage(bc)
+		msg := *messages.DeserializeMessage(bc)
 
 		helper.VerboseEventLog(
 			"A message was RECEIVED",
 			&helper.LogOptions{
-				MT: msg.MessageType,
-				MP: fmt.Sprint(*msg.MessageParams),
-				MS: addr.String(),
+				MessageString: string(msg.SerializeMessage()),
+				MT:            msg.MessageType,
+				MP:            fmt.Sprint(*msg.MessageParams),
+				MS:            addr.String(),
 			},
 		)
 

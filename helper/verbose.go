@@ -13,6 +13,9 @@ type LogOptions struct {
 	// IP
 	IP string
 
+	// MessageSent
+	MessageString string
+
 	// MessageType
 	MT string
 

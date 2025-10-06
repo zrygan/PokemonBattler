@@ -77,6 +77,9 @@ func main() {
 				"Enter your chosen Pokemon",
 			)
 
+			// Send CommunicationMode to Joiner
+			conn.WriteToUDP([]byte(strconv.Itoa(commMode)), addr)
+
 			//FIXME: do some checking here if the pokemon is valid
 			pokemon := helper.ReadLine()
 
