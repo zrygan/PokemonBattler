@@ -7,53 +7,59 @@ import (
 const verbose bool = true
 
 type LogOptions struct {
-	// Name
 	Name string
-
-	// Port
 	Port string
+	IP   string
 
-	// IP
-	IP string
-
-	// MessageSent
-	MessageString string
-
-	// MessageType
-	MT string
-
-	// MessageParameters
-	MP string
+	MessageParams any
 
 	// MessageSender (address)
 	MS string
 }
 
-func VerboseEventLog(
-	message string,
-	opts *LogOptions,
-) {
-	if verbose {
-		fmt.Print("🔴 LOG :: ", message)
+func VerboseEventLog(message string, opts *LogOptions) {
+	if !verbose {
+		return
+	}
 
-		if opts != nil {
-			fmt.Println()
-			if opts.Port != "" {
-				fmt.Printf("\t> Port: %s\n", opts.Port)
-			}
-			if opts.IP != "" {
-				fmt.Printf("\t> IP: %s\n", opts.IP)
-			}
-			if opts.MT != "" {
-				fmt.Printf("\t> MessageType: %s\n", opts.MT)
-			}
-			if opts.MP != "" {
-				fmt.Printf("\t> MessageParams: %s\n", opts.MP)
-			}
-			if opts.MS != "" {
-				fmt.Printf("\t> MessageSender: %s\n", opts.MS)
-			}
+	fmt.Print("🔴 LOG :: ", message)
+
+	if opts == nil {
+		fmt.Printf("\n\n")
+		return
+	}
+
+	fmt.Println()
+
+	if opts.Port != "" {
+		fmt.Printf("\t> Src Port: %s\n", opts.Port)
+	}
+	if opts.IP != "" {
+		fmt.Printf("\t> Src IP: %s\n", opts.IP)
+	}
+
+	// Handle MessageParams cleanly
+	if opts.MessageParams != nil {
+		fmt.Printf("\t> MessageParams:\n")
+
+		var m map[string]any
+		switch t := opts.MessageParams.(type) {
+		case map[string]any:
+			m = t
+		case *map[string]any:
+			m = *t
+		default:
+			fmt.Printf("\t\t<invalid type: %T>\n", t)
+			return
 		}
+
+		for k, v := range m {
+			fmt.Printf("\t\t%s: %v\n", k, v)
+		}
+	}
+
+	if opts.MS != "" {
+		fmt.Printf("\t> MessageSender: %s\n", opts.MS)
 	}
 
 	fmt.Println()
