@@ -1,3 +1,5 @@
+// Package netio provides network I/O utilities and user interaction functions
+// for the Pokemon Battler application.
 package netio
 
 import (
@@ -5,6 +7,8 @@ import (
 	"net"
 )
 
+// getLocalIP determines the local IP address by connecting to a public DNS server.
+// Returns "127.0.0.1" if unable to determine the local IP.
 func getLocalIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
@@ -16,6 +20,9 @@ func getLocalIP() string {
 	return localAddr.IP.String()
 }
 
+// Login handles user login and network configuration.
+// Returns name, ip, port, and isLocal flag for peer descriptor creation.
+// Special handling for "hostW" userType to use discovery port 50000.
 func Login(userType string) (string, string, string, bool) {
 	fmt.Println("Welcome to PokeBattler")
 	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")

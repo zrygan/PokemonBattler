@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-// SerializeMessage converts a Message to bytes
+// SerializeMessage converts a Message to a byte slice for network transmission.
+// The format is a simple key-value text protocol with newline separation.
 func (m *Message) SerializeMessage() []byte {
 	var sb strings.Builder
 
@@ -20,7 +21,8 @@ func (m *Message) SerializeMessage() []byte {
 	return []byte(sb.String())
 }
 
-// DeserializeMessage converts bytes to a Message
+// DeserializeMessage converts a byte slice back to a Message struct.
+// It parses the key-value text protocol and automatically converts numeric strings to integers.
 func DeserializeMessage(bs []byte) *Message {
 	msg := &Message{
 		MessageParams: &map[string]any{},

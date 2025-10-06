@@ -1,3 +1,5 @@
+// Package main implements the Pokemon Battler joiner application.
+// The joiner discovers available hosts and connects to one for a battle.
 package main
 
 import (
@@ -11,6 +13,9 @@ import (
 	"github.com/zrygan/pokemonbattler/peer"
 )
 
+// lookForMatch broadcasts a discovery message to find available hosts on the network.
+// It listens for 3 seconds and returns a map of discovered hosts with their connection details.
+// The returned map keys are host names, values are "ip port" strings.
 func lookForMatch() map[string]string {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
@@ -74,6 +79,8 @@ func lookForMatch() map[string]string {
 	return discoveredHosts
 }
 
+// selectMatch prompts the user to choose a host from the discovered hosts.
+// It validates the selection and returns a PeerDescriptor for the chosen host.
 func selectMatch(hosts map[string]string) peer.PeerDescriptor {
 	// once all joinable are found, ask which one to join/Handshake
 	// stores [ip, port] of invited
@@ -92,6 +99,8 @@ func selectMatch(hosts map[string]string) peer.PeerDescriptor {
 	return peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
 }
 
+// handshake sends a handshake request to the selected host and waits for a response.
+// Returns the battle seed received from the host for synchronized random number generation.
 func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 	// send a HandshakeRequest to the Host
 	msg := messages.MakeHandshakeRequest(self)
@@ -136,6 +145,8 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 	}
 }
 
+// main is the entry point for the joiner application.
+// It discovers hosts, allows user selection, and initiates the handshake process.
 func main() {
 	self := peer.MakePDFromLogin("joiner")
 	defer self.Conn.Close()

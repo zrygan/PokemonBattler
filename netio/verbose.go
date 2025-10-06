@@ -4,19 +4,24 @@ import (
 	"fmt"
 )
 
+// verbose controls whether verbose logging is enabled globally.
 const verbose bool = true
 
+// LogOptions contains optional parameters for verbose logging.
+// Used to display detailed information about network events and messages.
 type LogOptions struct {
-	Name string
-	Port string
-	IP   string
+	Name string // Peer name
+	Port string // Network port
+	IP   string // IP address
 
-	MessageParams any
+	MessageParams any // Message parameters to display
 
-	// MessageSender (address)
+	// MS (MessageSender) contains the sender's address
 	MS string
 }
 
+// VerboseEventLog logs detailed information about network events when verbose mode is enabled.
+// Takes a message string and optional LogOptions for additional context.
 func VerboseEventLog(message string, opts *LogOptions) {
 	if !verbose {
 		return

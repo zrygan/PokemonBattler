@@ -7,13 +7,16 @@ import (
 	"strings"
 )
 
+// ShowMenu displays a menu or instructions to the user.
+// Takes variable number of string arguments to display.
 func ShowMenu(texts ...string) {
 	for _, line := range texts {
 		fmt.Printf("%s", line)
 	}
 }
 
-// PRLine is Print-Read Line, prints instructions and takes input
+// PRLine (Print-Read Line) displays an instruction and reads user input.
+// Returns the trimmed input string.
 func PRLine(instruction string) string {
 	fmt.Println(instruction)
 	reader := bufio.NewReader(os.Stdin)
@@ -22,7 +25,8 @@ func PRLine(instruction string) string {
 	return strings.TrimSpace(line)
 }
 
-// RLine is Read-only Line, takes input. Uses PRLine but with empty string as input
+// RLine (Read Line) reads user input without displaying an instruction.
+// Uses PRLine with an empty instruction string.
 func RLine() string {
 	return PRLine("")
 }
