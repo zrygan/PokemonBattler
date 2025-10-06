@@ -9,9 +9,10 @@ import (
 	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
 	"github.com/zrygan/pokemonbattler/netio"
+	"github.com/zrygan/pokemonbattler/peer"
 )
 
-func broadcastAsJoinable(pd game.PeerDescriptor) {
+func broadcastAsJoinable(pd peer.PeerDescriptor) {
 	buf := make([]byte, 1024)
 
 	for {
@@ -21,55 +22,30 @@ func broadcastAsJoinable(pd game.PeerDescriptor) {
 		}
 
 		msg := strings.TrimSpace(string(buf[:n]))
+
+		// send a message if somebody wants to join
 		if msg == messages.MMB_JOINING {
 			netio.VerboseEventLog(
-				"Found a JOINER, asked to play.",
+				"Found a JOINER, received a "+messages.MMB_JOINING+" message",
 				nil,
 			)
 
-			res := messages.MakeHostingMMB(pd.Name, pd.Addr)
+			res := messages.MakeHostingMMB(pd)
+
+			netio.VerboseEventLog(
+				"Found a JOINER, sent a "+messages.MMB_HOSTING+" message",
+				nil,
+			)
 
 			_, _ = pd.Conn.WriteToUDP(
 				res.SerializeMessage(),
 				rem,
 			)
 		}
-
-		// somewhere here, i handle the handshake request
-		// maybe break this loop when i receive one
 	}
 }
 
-// The parameter arguments is
-func hostTo() game.PeerDescriptor {
-	name, port, ip := netio.Login()
-
-	addr, err := net.ResolveUDPAddr("udp", ip+":"+port)
-	if err != nil {
-		panic(err)
-	}
-
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		panic(err)
-	}
-
-	netio.VerboseEventLog(
-		"A new HOST connected.",
-		&netio.LogOptions{
-			Port: port,
-			IP:   ip,
-		},
-	)
-
-	return game.PeerDescriptor{
-		Name: name,
-		Conn: conn,
-		Addr: addr,
-	}
-}
-
-func handshakeJoiner(pd game.PeerDescriptor, addr *net.UDPAddr) {
+func handshake(pd peer.PeerDescriptor, addr *net.UDPAddr) {
 	// send back a HandshakeResponse
 	msg := messages.MakeHandshakeResponse()
 	pd.Conn.WriteToUDP(msg.SerializeMessage(), addr)
@@ -91,7 +67,7 @@ func handshakeJoiner(pd game.PeerDescriptor, addr *net.UDPAddr) {
 
 	var commMode int
 	for {
-		line := netio.ReadLine()
+		line := netio.RLine()
 		commMode, err := strconv.Atoi(line)
 		if err != nil {
 			fmt.Println("Enter 0 or 1")
@@ -113,7 +89,7 @@ func handshakeJoiner(pd game.PeerDescriptor, addr *net.UDPAddr) {
 	pd.Conn.WriteToUDP([]byte(strconv.Itoa(commMode)), addr)
 
 	//FIXME: do some checking here if the pokemon is valid
-	pokemon := netio.ReadLine()
+	pokemon := netio.RLine()
 
 	netio.ShowMenu(
 		"Allocate stat boosts for your special attack and defense!",
@@ -123,7 +99,7 @@ func handshakeJoiner(pd game.PeerDescriptor, addr *net.UDPAddr) {
 
 	sb := new(game.StatBoosts)
 	for {
-		line := strings.Split(netio.ReadLine(), " ")
+		line := strings.Split(netio.RLine(), " ")
 
 		// check if this is of length 2
 		if len(line) != 2 {
@@ -165,24 +141,21 @@ func handshakeJoiner(pd game.PeerDescriptor, addr *net.UDPAddr) {
 }
 
 func main() {
-	// a general variable for Message
-	var msg messages.Message
-
-	pd := hostTo()
-	defer pd.Conn.Close()
+	self := peer.MakePDFromLogin("host")
+	defer self.Conn.Close()
 
 	// at the start say that somebody can join you
-	broadcastAsJoinable(pd)
+	broadcastAsJoinable(self)
 
 	buf := make([]byte, 1024)
 	for {
-		n, addr, err := pd.Conn.ReadFromUDP(buf)
+		n, addr, err := self.Conn.ReadFromUDP(buf)
 		if err != nil {
 			panic(err)
 		}
 
 		bc := buf[:n]
-		msg = *messages.DeserializeMessage(bc)
+		msg := *messages.DeserializeMessage(bc)
 
 		netio.VerboseEventLog(
 			"A message was RECEIVED",
@@ -192,8 +165,5 @@ func main() {
 				MS: addr.String(),
 			},
 		)
-
-		if msg.MessageType == messages.HandshakeRequest {
-		}
 	}
 }

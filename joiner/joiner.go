@@ -3,14 +3,15 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
-	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
 	"github.com/zrygan/pokemonbattler/netio"
+	"github.com/zrygan/pokemonbattler/peer"
 )
 
-func lookForJoinables(udp *net.UDPAddr) {
+func lookForJoinables(udp *net.UDPAddr) map[string]string {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		panic(err)
@@ -19,8 +20,8 @@ func lookForJoinables(udp *net.UDPAddr) {
 
 	// broadcast
 	bAddr := net.UDPAddr{
-		IP:   net.IPv4bcast,      // 255.255.255.255
-		Port: game.DiscoveryPort, // 50000
+		IP:   net.IPv4bcast, // 255.255.255.255
+		Port: 50000,         // discovery port
 	}
 
 	// send the broadcast message
@@ -44,12 +45,12 @@ func lookForJoinables(udp *net.UDPAddr) {
 
 		msg := messages.DeserializeMessage(buf[:n])
 		if msg.MessageType == messages.MMB_HOSTING {
-			hostName := fmt.Sprint((*msg.MessageParams)["hostName"])
+			hostName := fmt.Sprint((*msg.MessageParams)["name"])
 			hostPort := fmt.Sprint((*msg.MessageParams)["port"])
 			hostIP := fmt.Sprint((*msg.MessageParams)["ip"])
 
 			netio.VerboseEventLog(
-				"Found a HOST, asked to join.",
+				"Found a HOST, received a "+messages.MMB_HOSTING+" message",
 				&netio.LogOptions{
 					Name: hostName,
 					Port: hostPort,
@@ -59,87 +60,61 @@ func lookForJoinables(udp *net.UDPAddr) {
 
 			hostDets := fmt.Sprintf("%s %s", hostIP, hostPort)
 
-			discoveredHosts[hostDets] = hostName
+			discoveredHosts[hostName] = hostDets
 		}
 	}
 
 	fmt.Println("Discovered Hosts")
-	for details, name := range discoveredHosts {
-		fmt.Printf("%s @ %s\n", name, details)
+	for name, details := range discoveredHosts {
+		fmt.Printf("\t%s @ %s\n", name, details)
 	}
+	fmt.Println()
+
+	return discoveredHosts
 }
 
-func joinTo() game.PeerDescriptor {
-	name, port, ip := netio.Login()
-
-	addr, err := net.ResolveUDPAddr("udp", ip+":"+port)
-	if err != nil {
-		panic(err)
-	}
-
-	conn, err := net.DialUDP("udp", nil, addr)
-	if err != nil {
-		panic(err)
-	}
-
-	netio.VerboseEventLog(
-		"A new JOINER connected.",
-		&netio.LogOptions{
-			Port: port,
-			IP:   ip,
-		},
-	)
-
-	return game.PeerDescriptor{
-		Name: name,
-		Conn: conn,
-		Addr: addr,
-	}
-}
-
-func handshakeHost(pd game.PeerDescriptor) {
-	// send a HandshakeRequest to the Host (if there is?)
+func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
+	// send a HandshakeRequest to the Host
 	msg := messages.MakeHandshakeRequest()
-	pd.Conn.Write(msg.SerializeMessage())
 
 	netio.VerboseEventLog(
-		"A message was SENT",
+		"Inviting "+host.Name+", sent a "+messages.HandshakeRequest+" message",
 		&netio.LogOptions{
 			MT: msg.MessageType,
 		},
 	)
 
-	buf := make([]byte, 1024)
-	for {
-		n, addr, err := pd.Conn.ReadFromUDP(buf)
-		if err != nil {
-			panic(err)
-		}
-
-		// buffer content
-		bc := buf[:n]
-		msg := *messages.DeserializeMessage(bc)
-
-		netio.VerboseEventLog(
-			"A message was RECEIVED",
-			&netio.LogOptions{
-				MessageString: string(msg.SerializeMessage()),
-				MT:            msg.MessageType,
-				MP:            fmt.Sprint(*msg.MessageParams),
-				MS:            addr.String(),
-			},
-		)
-
-		// check if this is a HandshakeResponse
-		// then create a BattleSetup once done
-		if msg.MessageType == messages.HandshakeResponse {
-		}
+	// send the handshake to host address
+	_, err := self.Conn.WriteToUDP(msg.SerializeMessage(), host.Addr)
+	if err != nil {
+		panic(err)
 	}
+
+	// wait for host response
 }
 
 func main() {
-	pd := joinTo()
-	defer pd.Conn.Close()
+	self := peer.MakePDFromLogin("joiner")
+	defer self.Conn.Close()
 
-	lookForJoinables(pd.Addr)
+	hosts := lookForJoinables(self.Addr)
+
+	// once all joinable are found, ask which one to join/Handshake
+	// stores [ip, port] of invited
+	var hostDets []string = nil
+	hostName := ""
+	for hostDets == nil {
+		hostName = netio.PRLine("Send an invite to...")
+		hostVal, ok := hosts[hostName]
+		if ok {
+			hostDets = strings.Split(hostVal, " ")
+		} else {
+			fmt.Println("Player name not found.")
+		}
+	}
+
+	host := peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+
+	// once host is found, init a handshake
+	handshake(self, host)
 }
