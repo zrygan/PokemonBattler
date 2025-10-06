@@ -99,7 +99,6 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
 	netio.VerboseEventLog(
 		"Inviting "+host.Name+", sent a "+messages.HandshakeRequest+" message",
 		&netio.LogOptions{
-			MT:            msg.MessageType,
 			MessageParams: msg.MessageParams,
 		},
 	)

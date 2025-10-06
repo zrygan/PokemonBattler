@@ -53,7 +53,6 @@ func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
 				netio.VerboseEventLog(
 					"Match found, received a "+messages.HandshakeRequest+" message from "+name,
 					&netio.LogOptions{
-						MT:            msg.MessageType,
 						MessageParams: msg.MessageParams,
 						MS:            rem.String(),
 					},
@@ -73,7 +72,6 @@ func handshake(self peer.PeerDescriptor, addr *net.UDPAddr) {
 	netio.VerboseEventLog(
 		"A message was SENT",
 		&netio.LogOptions{
-			MT:            msg.MessageType,
 			MessageParams: msg.MessageParams,
 		},
 	)

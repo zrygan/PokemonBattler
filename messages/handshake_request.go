@@ -1,8 +1,11 @@
 package messages
 
-func MakeHandshakeRequest() Message {
+func MakeHandshakeRequest(username string) Message {
+	param := map[string]any{
+		"name": username,
+	}
 	return Message{
 		MessageType:   HandshakeRequest,
-		MessageParams: nil, // Request has no Params
+		MessageParams: &param, // Request has no Params
 	}
 }
