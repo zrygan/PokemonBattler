@@ -27,8 +27,10 @@ func Login(userType string) (string, string, string, bool) {
 	if port == "" {
 		port = "0" // make OS assign a random port
 	}
-	if userType == "host" {
-		port = "50000" // discovery port
+	if userType == "hostW" {
+		// hostW refers to a host without a game
+		// discovery port, put them on discovery port for joiners to see them
+		port = "50000"
 	}
 
 	ip := PRLine("Choose your IP?")
