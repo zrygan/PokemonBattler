@@ -92,9 +92,9 @@ func selectMatch(hosts map[string]string) peer.PeerDescriptor {
 	return peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
 }
 
-func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
+func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 	// send a HandshakeRequest to the Host
-	msg := messages.MakeHandshakeRequest(self.Name)
+	msg := messages.MakeHandshakeRequest(self)
 
 	netio.VerboseEventLog(
 		"Inviting "+host.Name+", sent a "+messages.HandshakeRequest+" message",
@@ -107,6 +107,32 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) {
 	_, err := self.Conn.WriteToUDP(msg.SerializeMessage(), host.Addr)
 	if err != nil {
 		panic(err)
+	}
+
+	buf := make([]byte, 1024)
+
+	for {
+		n, _, err := self.Conn.ReadFromUDP(buf)
+		if err != nil {
+			panic(err)
+		}
+		msg := messages.DeserializeMessage(buf[:n])
+
+		if msg.MessageType == messages.HandshakeResponse {
+			netio.VerboseEventLog(
+				"The match is accepted, received a "+messages.HandshakeResponse+" message from "+host.Name,
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
+			val, ok := (*msg.MessageParams)["seed"].(int)
+			if !ok {
+				panic("seed not found in handshake response")
+			}
+
+			return val
+		}
 	}
 }
 
