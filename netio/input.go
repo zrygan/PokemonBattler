@@ -1,4 +1,4 @@
-package helper
+package netio
 
 import (
 	"bufio"
@@ -14,7 +14,6 @@ func ShowMenu(texts ...string) {
 }
 
 func ReadLine() string {
-
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("\n$ ")
 	line, _ := reader.ReadString('\n')

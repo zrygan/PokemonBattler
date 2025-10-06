@@ -5,8 +5,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/zrygan/pokemonbattler/helper"
 	"github.com/zrygan/pokemonbattler/messages"
+	"github.com/zrygan/pokemonbattler/netio"
 )
 
 func lookForJoinables() {
@@ -32,9 +32,9 @@ func joinTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
 		panic(err)
 	}
 
-	helper.VerboseEventLog(
+	netio.VerboseEventLog(
 		"A new JOINER connected.",
-		&helper.LogOptions{
+		&netio.LogOptions{
 			Port: port,
 			IP:   ip,
 		},
@@ -54,9 +54,9 @@ func main() {
 	msg = messages.MakeHandshakeRequest()
 	conn.Write(msg.SerializeMessage())
 
-	helper.VerboseEventLog(
+	netio.VerboseEventLog(
 		"A message was SENT",
-		&helper.LogOptions{
+		&netio.LogOptions{
 			MT: msg.MessageType,
 		},
 	)
@@ -72,9 +72,9 @@ func main() {
 		bc := buf[:n]
 		msg := *messages.DeserializeMessage(bc)
 
-		helper.VerboseEventLog(
+		netio.VerboseEventLog(
 			"A message was RECEIVED",
-			&helper.LogOptions{
+			&netio.LogOptions{
 				MessageString: string(msg.SerializeMessage()),
 				MT:            msg.MessageType,
 				MP:            fmt.Sprint(*msg.MessageParams),

@@ -8,9 +8,13 @@ import (
 	"strings"
 
 	"github.com/zrygan/pokemonbattler/game"
-	"github.com/zrygan/pokemonbattler/helper"
 	"github.com/zrygan/pokemonbattler/messages"
+	"github.com/zrygan/pokemonbattler/netio"
 )
+
+func broadcastAsJoinable(hostName string, udp *net.UDPAddr) {
+
+}
 
 // The parameter arguments is
 func hostTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
@@ -38,9 +42,9 @@ func hostTo(arguments []string) (*net.UDPAddr, *net.UDPConn) {
 		panic(err)
 	}
 
-	helper.VerboseEventLog(
+	netio.VerboseEventLog(
 		"A new HOST connected.",
-		&helper.LogOptions{
+		&netio.LogOptions{
 			Port: arguments[1],
 			IP:   arguments[2],
 		},
@@ -66,9 +70,9 @@ func main() {
 		bc := buf[:n]
 		msg = *messages.DeserializeMessage(bc)
 
-		helper.VerboseEventLog(
+		netio.VerboseEventLog(
 			"A message was RECEIVED",
-			&helper.LogOptions{
+			&netio.LogOptions{
 				MT: msg.MessageType,
 				MP: fmt.Sprint(msg.MessageParams),
 				MS: addr.String(),
@@ -80,24 +84,24 @@ func main() {
 			msg = messages.MakeHandshakeResponse()
 			conn.WriteToUDP(msg.SerializeMessage(), addr)
 
-			helper.VerboseEventLog(
+			netio.VerboseEventLog(
 				"A message was SENT",
-				&helper.LogOptions{
+				&netio.LogOptions{
 					MT: msg.MessageType,
 					MP: fmt.Sprint(*msg.MessageParams),
 				},
 			)
 
 			// create a BattleSetup once done
-			helper.ShowMenu(
-				"Commmunication Mode:",
+			netio.ShowMenu(
+				"Commmunicatnetion Mode:",
 				"\n\t(0) P2P: Game is directly between players",
 				"\n\t(1) BROADCAST: Game is announced to local network.",
 			)
 
 			var commMode int
 			for {
-				line := helper.ReadLine()
+				line := netio.ReadLine()
 				commMode, err = strconv.Atoi(line)
 				if err != nil {
 					fmt.Println("Enter 0 or 1")
@@ -111,17 +115,17 @@ func main() {
 				}
 			}
 
-			helper.ShowMenu(
+			netio.ShowMenu(
 				"Enter your chosen Pokemon",
 			)
 
-			// Send CommunicationMode to Joiner
+			// Send CommunicatnetionMode to Joiner
 			conn.WriteToUDP([]byte(strconv.Itoa(commMode)), addr)
 
 			//FIXME: do some checking here if the pokemon is valid
-			pokemon := helper.ReadLine()
+			pokemon := netio.ReadLine()
 
-			helper.ShowMenu(
+			netio.ShowMenu(
 				"Allocate stat boosts for your special attack and defense!",
 				"\nFormat is 2 integers <attack_boost> <defense_boost>",
 				"\nThe two integers must sum to 10",
@@ -129,7 +133,7 @@ func main() {
 
 			sb := new(game.StatBoosts)
 			for {
-				line := strings.Split(helper.ReadLine(), " ")
+				line := strings.Split(netio.ReadLine(), " ")
 
 				// check if this is of length 2
 				if len(line) != 2 {
