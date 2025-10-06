@@ -12,49 +12,69 @@ import (
 	"github.com/zrygan/pokemonbattler/peer"
 )
 
-func broadcastAsJoinable(pd peer.PeerDescriptor) {
+func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
 	buf := make([]byte, 1024)
 
 	for {
-		n, rem, err := pd.Conn.ReadFromUDP(buf)
+		n, rem, err := self.Conn.ReadFromUDP(buf)
 		if err != nil {
 			panic(err)
 		}
 
-		msg := strings.TrimSpace(string(buf[:n]))
+		msg := messages.DeserializeMessage(buf[:n])
 
 		// send a message if somebody wants to join
-		if msg == messages.MMB_JOINING {
+		switch msg.MessageType {
+		case messages.MMB_JOINING:
 			netio.VerboseEventLog(
 				"Found a JOINER, received a "+messages.MMB_JOINING+" message",
 				nil,
 			)
 
-			res := messages.MakeHostingMMB(pd)
+			res := messages.MakeHostingMMB(self)
 
 			netio.VerboseEventLog(
 				"Found a JOINER, sent a "+messages.MMB_HOSTING+" message",
-				nil,
+				&netio.LogOptions{
+					MessageParams: res.MessageParams,
+				},
 			)
 
-			_, _ = pd.Conn.WriteToUDP(
+			_, _ = self.Conn.WriteToUDP(
 				res.SerializeMessage(),
 				rem,
 			)
+		case messages.HandshakeRequest:
+			name, nameOK := (*msg.MessageParams)["name"].(string)
+			port, portOK := (*msg.MessageParams)["port"].(string)
+			ip, ipOK := (*msg.MessageParams)["ip"].(string)
+
+			if nameOK || portOK || ipOK {
+				netio.VerboseEventLog(
+					"Match found, received a "+messages.HandshakeRequest+" message from "+name,
+					&netio.LogOptions{
+						MT:            msg.MessageType,
+						MessageParams: msg.MessageParams,
+						MS:            rem.String(),
+					},
+				)
+
+				return peer.MakeRemotePD(name, ip, port)
+			}
 		}
 	}
 }
 
-func handshake(pd peer.PeerDescriptor, addr *net.UDPAddr) {
+func handshake(self peer.PeerDescriptor, addr *net.UDPAddr) {
 	// send back a HandshakeResponse
 	msg := messages.MakeHandshakeResponse()
-	pd.Conn.WriteToUDP(msg.SerializeMessage(), addr)
+	self.Conn.WriteToUDP(msg.SerializeMessage(), addr)
 
 	netio.VerboseEventLog(
 		"A message was SENT",
 		&netio.LogOptions{
-			MT: msg.MessageType,
-			MP: fmt.Sprint(*msg.MessageParams),
+			MT:            msg.MessageType,
+			MessageParams: msg.MessageParams,
 		},
 	)
 
@@ -86,7 +106,7 @@ func handshake(pd peer.PeerDescriptor, addr *net.UDPAddr) {
 	)
 
 	// Send CommunicatnetionMode to Joiner
-	pd.Conn.WriteToUDP([]byte(strconv.Itoa(commMode)), addr)
+	self.Conn.WriteToUDP([]byte(strconv.Itoa(commMode)), addr)
 
 	//FIXME: do some checking here if the pokemon is valid
 	pokemon := netio.RLine()
@@ -136,34 +156,14 @@ func handshake(pd peer.PeerDescriptor, addr *net.UDPAddr) {
 		*sb,
 	)
 
-	pd.Conn.WriteToUDP(msg.SerializeMessage(), addr)
+	self.Conn.WriteToUDP(msg.SerializeMessage(), addr)
 
 }
 
 func main() {
-	self := peer.MakePDFromLogin("host")
+	self := peer.MakePDFromLogin("hostW")
 	defer self.Conn.Close()
 
 	// at the start say that somebody can join you
-	broadcastAsJoinable(self)
-
-	buf := make([]byte, 1024)
-	for {
-		n, addr, err := self.Conn.ReadFromUDP(buf)
-		if err != nil {
-			panic(err)
-		}
-
-		bc := buf[:n]
-		msg := *messages.DeserializeMessage(bc)
-
-		netio.VerboseEventLog(
-			"A message was RECEIVED",
-			&netio.LogOptions{
-				MT: msg.MessageType,
-				MP: fmt.Sprint(msg.MessageParams),
-				MS: addr.String(),
-			},
-		)
-	}
+	waitForMatch(self)
 }
