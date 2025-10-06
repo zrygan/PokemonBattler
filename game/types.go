@@ -1,18 +1,12 @@
 package game
 
-import "net"
+import "github.com/zrygan/pokemonbattler/peer"
 
 type User struct {
-	PD            PeerDescriptor
+	PD            peer.PeerDescriptor
 	GameStruct    *Game
 	PokemonStruct *Pokemon
 	UserType      UserTypeEnum
-}
-
-type PeerDescriptor struct {
-	Name string
-	Conn *net.UDPConn
-	Addr *net.UDPAddr // has Port and IP
 }
 
 type Game struct {
