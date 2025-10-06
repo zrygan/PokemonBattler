@@ -16,7 +16,7 @@ func getLocalIP() string {
 	return localAddr.IP.String()
 }
 
-func Login() (string, string, string, bool) {
+func Login(userType string) (string, string, string, bool) {
 	fmt.Println("Welcome to PokeBattler")
 	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")
 	fmt.Println()
@@ -25,7 +25,10 @@ func Login() (string, string, string, bool) {
 
 	port := PRLine("Choose your port?")
 	if port == "" {
-		port = "50000"
+		port = "0" // make OS assign a random port
+	}
+	if userType == "host" {
+		port = "50000" // discovery port
 	}
 
 	ip := PRLine("Choose your IP?")
