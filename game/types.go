@@ -37,5 +37,3 @@ const (
 	P2P CommunicationModeEnum = iota
 	Broadcast
 )
-
-const DiscoveryPort = 50000
