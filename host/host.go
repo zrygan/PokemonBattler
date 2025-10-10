@@ -102,8 +102,11 @@ func main() {
 	handshake(self, joiner)
 
 	// set the communication for a battle
-	game.Host_setCommMode()
+	cmode := game.Host_setCMode(self, joiner)
 
 	// create Host's player
-	game.PlayerSetUp(self)
+	p := game.PlayerSetUp(self)
+
+	// make BattleSetup
+	game.BattleSetup(p, joiner, cmode)
 }

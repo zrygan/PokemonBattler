@@ -158,6 +158,12 @@ func main() {
 	// when selectMatch returns, initialize a handshake
 	handshake(self, host)
 
+	// get the communication mode from the host
+	cmode := game.Joiner_getCMode(self)
+
 	// create joiner's player
-	game.PlayerSetUp(self)
+	p := game.PlayerSetUp(self)
+
+	// exchange BattleSetup
+	game.BattleSetup(p, host, cmode)
 }
