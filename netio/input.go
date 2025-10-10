@@ -30,3 +30,14 @@ func PRLine(instruction string) string {
 func RLine() string {
 	return PRLine("")
 }
+
+// ERLine (ERror Line) displays an error message, terminates when required
+// by shouldStop.
+func ERLine(errorcode string, shouldStop bool) {
+	err := "🛑 Error: " + errorcode
+	if shouldStop {
+		panic(err)
+	}
+
+	fmt.Println(err)
+}

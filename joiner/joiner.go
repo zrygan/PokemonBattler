@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
 	"github.com/zrygan/pokemonbattler/netio"
 	"github.com/zrygan/pokemonbattler/peer"
@@ -152,6 +153,11 @@ func main() {
 	defer self.Conn.Close()
 
 	availableHosts := lookForMatch()
-	matchedHost := selectMatch(availableHosts)
-	handshake(self, matchedHost)
+	host := selectMatch(availableHosts)
+
+	// when selectMatch returns, initialize a handshake
+	handshake(self, host)
+
+	// create joiner's player
+	game.PlayerSetUp(self)
 }

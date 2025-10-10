@@ -18,5 +18,10 @@ const (
 	// Handshake message types
 	HandshakeRequest  = "HANDSHAKE_REQUEST"  // Joiner requests to connect to host
 	HandshakeResponse = "HANDSHAKE_RESPONSE" // Host accepts connection and provides seed
-	BattleSetup       = "BATTLE_SETUP"       // Battle configuration message
+
+	// BattleSetup message types
+	BattleSetup = "BATTLE_SETUP" // Battle configuration message
+
+	// (stage) GameSetup message types
+	GS_COMMMODE = "COMM_MODE"
 )

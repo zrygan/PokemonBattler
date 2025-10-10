@@ -1,22 +1,18 @@
 package messages
 
-import "github.com/zrygan/pokemonbattler/game"
+import (
+	"github.com/zrygan/pokemonbattler/game"
+	"github.com/zrygan/pokemonbattler/peer"
+)
 
 // MakeBattleSetup creates a battle setup message with game configuration.
-// Includes communication mode, pokemon selection, and stat boost allocation.
 func MakeBattleSetup(
-	commMode game.CommunicationModeEnum,
-	pokemonName string,
-	userStatBoost game.StatBoosts,
-) Message {
-	params := map[string]any{
-		"communication_mode": commMode,
-		"pokemon":            pokemonName,
-		"stat_boosts":        userStatBoost,
-	}
-
-	return Message{
-		MessageType:   BattleSetup,
-		MessageParams: &params,
-	}
+	host,
+	joiner peer.PeerDescriptor,
+	spectators []peer.PeerDescriptor,
+	seed int,
+	commMode string, // ensure, only "P" or "B"
+) game.Game {
+	// set up communication mode
+	return game.Game{}
 }

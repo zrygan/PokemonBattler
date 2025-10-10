@@ -12,6 +12,6 @@ func MakeHandshakeRequest(pd peer.PeerDescriptor) Message {
 	}
 	return Message{
 		MessageType:   HandshakeRequest,
-		MessageParams: &param, // Request has no Params
+		MessageParams: &param,
 	}
 }
