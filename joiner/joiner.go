@@ -82,14 +82,32 @@ func lookForMatch() map[string]string {
 
 // selectMatch prompts the user to choose a host from the discovered hosts.
 // It validates the selection and returns a PeerDescriptor for the chosen host.
-func selectMatch(hosts map[string]string) peer.PeerDescriptor {
+// Returns nil if user requests to restart discovery with /R command.
+func selectMatch(hosts map[string]string) *peer.PeerDescriptor {
 	// once all joinable are found, ask which one to join/Handshake
 	// stores [ip, port] of invited
 	var hostDets []string = nil
 	hostName := ""
 	for hostDets == nil {
-		hostName = netio.PRLine("Send an invite to...")
+		hostName = netio.PRLine("Send an invite to... (or type /R to search again)")
+
+		// Check for restart command (case-insensitive)
+		if strings.ToUpper(hostName) == "/R" {
+			return nil
+		}
+
+		// Try exact match first, then case-insensitive
 		hostVal, ok := hosts[hostName]
+		if !ok {
+			// Try case-insensitive search
+			for key, val := range hosts {
+				if strings.EqualFold(key, hostName) {
+					hostVal = val
+					ok = true
+					break
+				}
+			}
+		}
 		if ok {
 			hostDets = strings.Split(hostVal, " ")
 		} else {
@@ -97,7 +115,8 @@ func selectMatch(hosts map[string]string) peer.PeerDescriptor {
 		}
 	}
 
-	return peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+	pd := peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+	return &pd
 }
 
 // handshake sends a handshake request to the selected host and waits for a response.
@@ -142,6 +161,13 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 			}
 
 			return val
+		} else if msg.MessageType == messages.HandshakeRejected {
+			netio.VerboseEventLog(
+				"Connection rejected by "+host.Name,
+				nil,
+			)
+			fmt.Println("\n❌ Host declined your connection request.")
+			return -1 // Return -1 to signal rejection
 		}
 	}
 }
@@ -152,11 +178,32 @@ func main() {
 	self := peer.MakePDFromLogin("joiner")
 	defer self.Conn.Close()
 
-	availableHosts := lookForMatch()
-	host := selectMatch(availableHosts)
+	// Allow restarting host discovery
+	var host *peer.PeerDescriptor
+	var seed int
+	for {
+		for host == nil {
+			availableHosts := lookForMatch()
+			host = selectMatch(availableHosts)
 
-	// when selectMatch returns, initialize a handshake
-	handshake(self, host)
+			if host == nil {
+				fmt.Println("\n--- Restarting host discovery ---")
+			}
+		}
+
+		// when selectMatch returns, initialize a handshake
+		seed = handshake(self, *host)
+
+		// Check if handshake was rejected
+		if seed == -1 {
+			fmt.Println("Searching for hosts again...")
+			host = nil // Reset host to restart discovery
+			continue
+		}
+
+		// Handshake successful, break out of loop
+		break
+	}
 
 	// get the communication mode from the host
 	cmode := game.Joiner_getCMode(self)
@@ -164,6 +211,9 @@ func main() {
 	// create joiner's player
 	p := game.PlayerSetUp(self)
 
-	// exchange BattleSetup
-	game.BattleSetup(p, host, cmode)
+	// exchange BattleSetup and get opponent player info
+	opponentPlayer := game.BattleSetup(p, *host, cmode, []peer.PeerDescriptor{})
+
+	// Start the battle (joiner has no spectators)
+	game.RunBattle(&p, &opponentPlayer, seed, cmode, false, []peer.PeerDescriptor{})
 }

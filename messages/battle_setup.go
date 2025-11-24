@@ -13,12 +13,10 @@ func MakeBattleSetup(
 	def int8,
 ) Message {
 	params := map[string]any{
-		"communication_mode": cmode,
-		"pokemon_name":       pokeName,
-		"stat_boosts": map[string]int8{
-			"special_attack_uses":  atk,
-			"special_defense_uses": def,
-		},
+		"communication_mode":   cmode,
+		"pokemon_name":         pokeName,
+		"special_attack_uses":  int(atk),
+		"special_defense_uses": int(def),
 	}
 	return Message{
 		MessageType:   BattleSetup,

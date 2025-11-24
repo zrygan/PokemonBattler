@@ -13,9 +13,10 @@ import (
 
 // waitForMatch listens for incoming joiner connections and match requests.
 // It handles discovery messages (MMB_JOINING) and handshake requests.
-// Returns a PeerDescriptor for the accepted joiner.
-func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
+// Returns a PeerDescriptor for the accepted joiner and a slice of spectators.
+func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDescriptor) {
 	buf := make([]byte, 1024)
+	spectators := make([]peer.PeerDescriptor, 0)
 
 	for {
 		n, rem, err := self.Conn.ReadFromUDP(buf)
@@ -47,6 +48,16 @@ func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
 				rem,
 			)
 
+		case messages.SpectatorRequest:
+			// Accept spectator automatically
+			spectatorName := "Spectator" + rem.String()
+			spectator := peer.MakePD(spectatorName, nil, rem)
+			spectators = append(spectators, spectator)
+			netio.VerboseEventLog(
+				"Spectator joined from "+rem.String(),
+				nil,
+			)
+
 		// if somebody is asking to handshake
 		// return the peer descriptor of the joiner if you accepted it
 		case messages.HandshakeRequest:
@@ -62,7 +73,12 @@ func waitForMatch(self peer.PeerDescriptor) peer.PeerDescriptor {
 
 				isAccepted := strings.ToLower(netio.PRLine("Accept this player? [Y:default / N]: "))
 				if isAccepted != "n" {
-					return peer.MakePD(name, nil, rem)
+					return peer.MakePD(name, nil, rem), spectators
+				} else {
+					// Send rejection message to joiner
+					rejectMsg := messages.MakeHandshakeRejected()
+					self.Conn.WriteToUDP(rejectMsg.SerializeMessage(), rem)
+					netio.VerboseEventLog("Joiner rejected, sent HANDSHAKE_REJECTED message", nil)
 				}
 			}
 		}
@@ -96,10 +112,10 @@ func main() {
 	defer self.Conn.Close()
 
 	// at the start say that somebody can join you
-	joiner := waitForMatch(self)
+	joiner, spectators := waitForMatch(self)
 
 	// when watchForMatch returns, initialize a handshake
-	handshake(self, joiner)
+	seed := handshake(self, joiner)
 
 	// set the communication for a battle
 	cmode := game.Host_setCMode(self, joiner)
@@ -107,6 +123,9 @@ func main() {
 	// create Host's player
 	p := game.PlayerSetUp(self)
 
-	// make BattleSetup
-	game.BattleSetup(p, joiner, cmode)
+	// make BattleSetup and get opponent player info
+	opponentPlayer := game.BattleSetup(p, joiner, cmode, spectators)
+
+	// Start the battle with spectators
+	game.RunBattle(&p, &opponentPlayer, seed, cmode, true, spectators)
 }

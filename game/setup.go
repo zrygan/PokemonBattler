@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -14,7 +15,7 @@ import (
 
 func Host_setCMode(host peer.PeerDescriptor, join peer.PeerDescriptor) string {
 	for {
-		mode := netio.PRLine("Select a communication mode:\nP: peer-to-peer\nB: broadcast")
+		mode := strings.ToUpper(netio.PRLine("Select a communication mode:\nP: peer-to-peer\nB: broadcast"))
 
 		switch mode {
 		case P2P:
@@ -53,7 +54,18 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 	var poke poke.Pokemon
 	for {
 		pokeName := netio.PRLine("Select a pokemon: ")
+		// Try exact match first, then case-insensitive
 		poke, ok = monsters.MONSTERS[pokeName]
+		if !ok {
+			// Try case-insensitive search
+			for key, mon := range monsters.MONSTERS {
+				if strings.EqualFold(key, pokeName) {
+					poke = mon
+					ok = true
+					break
+				}
+			}
+		}
 		if !ok {
 			netio.ERLine("Invalid pokemon. Please put a valid pokemon name", false)
 		} else {
@@ -86,27 +98,33 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 	}
 
 	return player.Player{
-		Peer:               self,
-		PokemonStruct:      poke,
-		SpecialDefenseUses: int8(spatk),
-		SpecialAttackUses:  int8(spdef),
+		Peer:                   self,
+		PokemonStruct:          poke,
+		SpecialAttackUsesLeft:  spatk,
+		SpecialDefenseUsesLeft: spdef,
 	}
 }
 
-func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string) {
+func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, spectators []peer.PeerDescriptor) player.Player {
 	// Send BATTLE_SETUP
 	msg := messages.MakeBattleSetup(
 		self,
 		cmode,
 		self.PokemonStruct.Name,
-		self.SpecialAttackUses,
-		self.SpecialDefenseUses,
+		int8(self.SpecialAttackUsesLeft),
+		int8(self.SpecialDefenseUsesLeft),
 	)
 
-	self.Peer.Conn.WriteToUDP(msg.SerializeMessage(), other.Addr)
+	msgBytes := msg.SerializeMessage()
+	self.Peer.Conn.WriteToUDP(msgBytes, other.Addr)
+
+	// Broadcast to spectators
+	for _, spec := range spectators {
+		self.Peer.Conn.WriteToUDP(msgBytes, spec.Addr)
+	}
 
 	netio.VerboseEventLog(
-		"Sent "+messages.BattleSetup+" message to"+other.Name,
+		"Sent "+messages.BattleSetup+" message to "+other.Name,
 		&netio.LogOptions{
 			MessageParams: msg.MessageParams,
 		},
@@ -131,6 +149,39 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string) {
 					MessageParams: res.MessageParams,
 				},
 			)
+
+			// Parse opponent's Pokemon data from the message
+			params := *res.MessageParams
+			opponentPokemonName := params["pokemon_name"].(string)
+			specialAttackUses := params["special_attack_uses"].(int)
+			specialDefenseUses := params["special_defense_uses"].(int)
+
+			// Load opponent's Pokemon
+			opponentPokemon, ok := monsters.MONSTERS[opponentPokemonName]
+			if !ok {
+				// Try case-insensitive
+				for key, mon := range monsters.MONSTERS {
+					if strings.EqualFold(key, opponentPokemonName) {
+						opponentPokemon = mon
+						ok = true
+						break
+					}
+				}
+			}
+
+			if !ok {
+				panic(fmt.Sprintf("Unknown Pokemon: %s", opponentPokemonName))
+			}
+
+			// Create opponent player
+			opponentPlayer := player.Player{
+				Peer:                   other,
+				PokemonStruct:          opponentPokemon,
+				SpecialAttackUsesLeft:  specialAttackUses,
+				SpecialDefenseUsesLeft: specialDefenseUses,
+			}
+
+			return opponentPlayer
 		}
 	}
 }
