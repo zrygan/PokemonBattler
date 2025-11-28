@@ -31,6 +31,24 @@ func RLine() string {
 	return PRLine("")
 }
 
+// StartInputListener starts a goroutine that continuously reads user input
+// and sends it to the returned channel. This allows non-blocking input reading.
+func StartInputListener() chan string {
+	inputChan := make(chan string)
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				close(inputChan)
+				return
+			}
+			inputChan <- strings.TrimSpace(line)
+		}
+	}()
+	return inputChan
+}
+
 // ERLine (ERror Line) displays an error message, terminates when required
 // by shouldStop.
 func ERLine(errorcode string, shouldStop bool) {

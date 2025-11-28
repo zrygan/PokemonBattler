@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -98,8 +99,11 @@ func RunBattle(
 	fmt.Printf("Special Defense Boosts: %d\n", selfPlayer.SpecialDefenseUsesLeft)
 	fmt.Println("\nTip: Type 'chat <message>' to send a chat message!")
 	fmt.Println("Stickers: /smile /laugh /cool /angry /sad /love /fire /star /thumbsup /hi /gg /nice /wow /ouch /lucky /attack /defend /heal /critical /miss /hit")
-	fmt.Println("Press Enter alone to send a chat message anytime during opponent's turn.")
+	fmt.Println("You can chat anytime during the battle, even during opponent's turn!")
 	fmt.Println()
+
+	// Start input listener for non-blocking input
+	inputChan := netio.StartInputListener()
 
 	// Battle loop
 	turnNumber := 1
@@ -114,30 +118,45 @@ func RunBattle(
 
 		if isMyTurn {
 			fmt.Println("Your turn!")
+			fmt.Println("Select a move (enter number) or 'chat <message>': ")
 
-			// Get move selection
+			// Get move selection using non-blocking input
 			moveIndex := -1
 			for moveIndex < 0 || moveIndex >= len(selfPlayer.PokemonStruct.Moves) {
-				input := netio.PRLine("Select a move (enter number) or 'chat <message>': ")
+				select {
+				case input := <-inputChan:
+					// Check if it's a chat command
+					if len(input) > 5 && input[:5] == "chat " {
+						chatText := input[5:]
+						sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+						continue
+					}
 
-				// Check if it's a chat command
-				if len(input) > 5 && input[:5] == "chat " {
-					chatText := input[5:]
-					sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
-					continue
-				}
+					// Check if it's a sticker
+					if strings.HasPrefix(input, "/") {
+						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						continue
+					}
 
-				// Check if it's a sticker
-				if strings.HasPrefix(input, "/") {
-					sendChatMessage(selfPlayer, opponentPlayer, game, input)
-					continue
-				}
-
-				idx, err := strconv.Atoi(input)
-				if err == nil && idx > 0 && idx <= len(selfPlayer.PokemonStruct.Moves) {
-					moveIndex = idx - 1
-				} else {
-					fmt.Println("Invalid selection. Please try again.")
+					idx, err := strconv.Atoi(input)
+					if err == nil && idx > 0 && idx <= len(selfPlayer.PokemonStruct.Moves) {
+						moveIndex = idx - 1
+					} else {
+						fmt.Println("Invalid selection. Please try again.")
+					}
+				default:
+					// Check for incoming network messages (chat from opponent)
+					buf := make([]byte, 65535)
+					selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+					n, _, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
+					if err == nil {
+						msg := messages.DeserializeMessage(buf[:n])
+						if msg.MessageType == messages.ChatMessage {
+							processIncomingChat(msg, isHost, battleCtx, buf[:n])
+						}
+					}
+					selfPlayer.Peer.Conn.SetReadDeadline(time.Time{}) // Clear deadline
+					time.Sleep(10 * time.Millisecond)                 // Small delay to prevent busy waiting
 				}
 			}
 			selectedMove := selfPlayer.PokemonStruct.Moves[moveIndex]
@@ -145,10 +164,30 @@ func RunBattle(
 			// Ask if they want to use a boost
 			useBoost := false
 			if selectedMove.DamageCategory == poke.Special && selfPlayer.SpecialAttackUsesLeft > 0 {
-				boostInput := netio.PRLine("Use a Special Attack boost? (y/n): ")
-				if boostInput == "y" || boostInput == "Y" {
-					useBoost = true
-					selfPlayer.SpecialAttackUsesLeft--
+				fmt.Println("Use a Special Attack boost? (y/n): ")
+				boostSelected := false
+				for !boostSelected {
+					select {
+					case boostInput := <-inputChan:
+						if boostInput == "y" || boostInput == "Y" {
+							useBoost = true
+							selfPlayer.SpecialAttackUsesLeft--
+						}
+						boostSelected = true
+					default:
+						// Check for incoming network messages
+						buf := make([]byte, 65535)
+						selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+						n, _, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
+						if err == nil {
+							msg := messages.DeserializeMessage(buf[:n])
+							if msg.MessageType == messages.ChatMessage {
+								processIncomingChat(msg, isHost, battleCtx, buf[:n])
+							}
+						}
+						selfPlayer.Peer.Conn.SetReadDeadline(time.Time{})
+						time.Sleep(10 * time.Millisecond)
+					}
 				}
 			}
 
@@ -161,11 +200,27 @@ func RunBattle(
 			if err != nil {
 				if err.Error() == "opponent_fainted" {
 					// Opponent's Pokemon fainted - we won!
-					fmt.Println("\n🎉 Opponent's Pokemon fainted! You win!")
+					game.State = StateGameOver
+					fmt.Println("\nOpponent's Pokemon fainted! You win!")
 					winner = selfPlayer.Peer.Name
 					loser = opponentPlayer.Peer.Name
 					game.BattleLog = append(game.BattleLog, fmt.Sprintf("%s's Pokemon fainted!", opponentPlayer.Peer.Name))
 					game.BattleLog = append(game.BattleLog, fmt.Sprintf("Winner: %s", winner))
+
+					// Send GAME_OVER message to opponent
+					seqNum := reliableConn.GetNextSequenceNumber()
+					gameOverMsg := messages.MakeGameOver(
+						winner,
+						loser,
+						seqNum,
+					)
+					gameOverBytes := gameOverMsg.SerializeMessage()
+					selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
+
+					// Broadcast to spectators
+					if isHost {
+						game.BroadcastToSpectators(gameOverBytes)
+					}
 					break
 				}
 				fmt.Printf("Error during turn: %v\n", err)
@@ -173,52 +228,73 @@ func RunBattle(
 			}
 		} else {
 			fmt.Println("Opponent's turn... waiting...")
-			fmt.Println("(Type 'chat <message>' or a sticker like '/gg' and press Enter to chat)")
+			fmt.Println("(You can still type messages and they'll be sent)")
 
-			// Start a goroutine to handle chat input during opponent's turn
-			chatDone := make(chan bool)
+			// Create done channel to signal when turn is complete
+			turnDone := make(chan error, 1)
+
+			// Start opponent's turn processing in goroutine
 			go func() {
-				for {
-					select {
-					case <-chatDone:
-						return
-					default:
-						input := netio.PRLine("")
-						if len(input) == 0 {
-							continue
-						}
-
-						// Check if it's a chat command
-						if len(input) > 5 && input[:5] == "chat " {
-							chatText := input[5:]
-							sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
-						} else if strings.HasPrefix(input, "/") {
-							// Treat as sticker
-							sendChatMessage(selfPlayer, opponentPlayer, game, input)
-						} else {
-							// Treat as regular message
-							sendChatMessage(selfPlayer, opponentPlayer, game, input)
-						}
-					}
-				}
+				err := battleCtx.ProcessTurn(poke.Move{}, false)
+				turnDone <- err
 			}()
 
-			// Process opponent's turn
-			err := battleCtx.ProcessTurn(poke.Move{}, false)
-			chatDone <- true // Stop the chat goroutine
-			if err != nil {
-				if err.Error() == "opponent_fainted" {
-					// This shouldn't happen on defender's turn, but handle it
-					fmt.Println("\n🎉 Opponent's Pokemon fainted! You win!")
-					winner = selfPlayer.Peer.Name
-					loser = opponentPlayer.Peer.Name
-					game.BattleLog = append(game.BattleLog, fmt.Sprintf("%s's Pokemon fainted!", opponentPlayer.Peer.Name))
-					game.BattleLog = append(game.BattleLog, fmt.Sprintf("Winner: %s", winner))
-					break
+			// Handle input while waiting for opponent's turn
+			for {
+				select {
+				case err := <-turnDone:
+					// Turn is complete
+					if err != nil {
+						if err.Error() == "opponent_fainted" {
+							// This shouldn't happen on defender's turn, but handle it
+							game.State = StateGameOver
+							fmt.Println("\nOpponent's Pokemon fainted! You win!")
+							winner = selfPlayer.Peer.Name
+							loser = opponentPlayer.Peer.Name
+							game.BattleLog = append(game.BattleLog, fmt.Sprintf("%s's Pokemon fainted!", opponentPlayer.Peer.Name))
+							game.BattleLog = append(game.BattleLog, fmt.Sprintf("Winner: %s", winner))
+
+							// Send GAME_OVER message to opponent
+							seqNum := reliableConn.GetNextSequenceNumber()
+							gameOverMsg := messages.MakeGameOver(
+								winner,
+								loser,
+								seqNum,
+							)
+							gameOverBytes := gameOverMsg.SerializeMessage()
+							selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
+
+							// Broadcast to spectators
+							if isHost {
+								game.BroadcastToSpectators(gameOverBytes)
+							}
+							goto exitBattle
+						}
+						fmt.Printf("Error during opponent's turn: %v\n", err)
+						goto exitBattle
+					}
+					goto turnComplete
+
+				case input := <-inputChan:
+					// User typed something during opponent's turn
+					if len(input) == 0 {
+						continue
+					}
+
+					// Check if it's a chat command
+					if len(input) > 5 && input[:5] == "chat " {
+						chatText := input[5:]
+						sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+					} else if strings.HasPrefix(input, "/") {
+						// Treat as sticker
+						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+					} else {
+						// Treat as regular message
+						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+					}
 				}
-				fmt.Printf("Error during opponent's turn: %v\n", err)
-				break
 			}
+		turnComplete:
 		}
 
 		// Display current status
@@ -284,6 +360,7 @@ func RunBattle(
 		turnNumber++
 	}
 
+exitBattle:
 	// Display Battle Log
 	fmt.Println("\n=== BATTLE END ===")
 	fmt.Println("\n📜 BATTLE LOG:")
@@ -367,5 +444,31 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 		fmt.Printf("You sent sticker: %s\n", displayText)
 	} else {
 		fmt.Printf("You: %s\n", messageText)
+	}
+}
+
+// processIncomingChat handles and displays incoming chat messages
+func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleContext, msgBytes []byte) {
+	params := *msg.MessageParams
+	senderName, _ := params["sender_name"].(string)
+	contentType, _ := params["content_type"].(string)
+
+	if contentType == "TEXT" {
+		if messageText, ok := params["message_text"].(string); ok && messageText != "" {
+			fmt.Printf("\n[%s]: %s\n", senderName, messageText)
+		}
+	} else if contentType == "STICKER" {
+		if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
+			if stickerText, exists := Stickers[strings.ToLower(stickerID)]; exists {
+				fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+			} else {
+				fmt.Printf("\n[%s] sent a sticker\n", senderName)
+			}
+		}
+	}
+
+	// Host relays chat to spectators
+	if isHost {
+		battleCtx.broadcastToSpectators(msgBytes)
 	}
 }

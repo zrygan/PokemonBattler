@@ -188,7 +188,7 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 					fmt.Printf("\n[%s]: %s\n", senderName, messageText)
 				}
 			} else if contentType == "STICKER" {
-				if stickerID, ok := params["sticker_id"].(string); ok && stickerID != "" {
+				if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
 					// Display sticker with its visual representation
 					if stickerText, exists := Stickers[strings.ToLower(stickerID)]; exists {
 						fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)

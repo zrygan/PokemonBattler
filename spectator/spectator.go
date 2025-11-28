@@ -305,7 +305,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 					fmt.Printf("[%s]: %s\n", sender, text)
 				}
 			} else if contentType == "STICKER" {
-				if stickerID, ok := params["sticker_id"].(string); ok && stickerID != "" {
+				if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
 					// Display sticker with its visual representation
 					if stickerText, exists := game.Stickers[strings.ToLower(stickerID)]; exists {
 						fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
