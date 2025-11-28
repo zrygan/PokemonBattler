@@ -23,7 +23,7 @@ func MakePDFromLogin(userType string) PeerDescriptor {
 	pd := MakePDBase(netio.Login(userType))
 
 	netio.VerboseEventLog(
-		"A new "+userType+" connected.",
+		"PokeProtocol: New "+userType+" Peer connected and listening",
 		&netio.LogOptions{
 			Port: strconv.Itoa(pd.Addr.Port),
 			IP:   pd.Addr.IP.String(),

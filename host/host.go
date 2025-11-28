@@ -31,14 +31,14 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 		switch msg.MessageType {
 		case messages.MMB_JOINING:
 			netio.VerboseEventLog(
-				"Found a JOINER, received a "+messages.MMB_JOINING+" message",
+				"PokeProtocol: Host Peer detected Joiner Peer discovery message",
 				nil,
 			)
 
 			res := messages.MakeHostingMMB(self)
 
 			netio.VerboseEventLog(
-				"Found a JOINER, sent a "+messages.MMB_HOSTING+" message",
+				"PokeProtocol: Host Peer sent discovery response message",
 				&netio.LogOptions{
 					MessageParams: res.MessageParams,
 				},
@@ -55,8 +55,10 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 			spectator := peer.MakePD(spectatorName, nil, rem)
 			spectators = append(spectators, spectator)
 			netio.VerboseEventLog(
-				"Spectator joined from "+rem.String(),
-				nil,
+				"PokeProtocol: Spectator Peer joined battle session",
+				&netio.LogOptions{
+					MS: rem.String(),
+				},
 			)
 
 		// if somebody is asking to handshake
@@ -65,13 +67,12 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 			name, nameOK := (*msg.MessageParams)["name"].(string)
 			if nameOK {
 				netio.VerboseEventLog(
-					"Match found, received a "+messages.HandshakeRequest+" message from "+name,
+					"PokeProtocol: Host Peer received HANDSHAKE_REQUEST from Joiner Peer '"+name+"'",
 					&netio.LogOptions{
 						MessageParams: msg.MessageParams,
 						MS:            rem.String(),
 					},
 				)
-
 				isAccepted := strings.ToLower(netio.PRLine("Accept this player? [Y:default / N]: "))
 				if isAccepted != "n" {
 					return peer.MakePD(name, nil, rem), spectators
@@ -79,7 +80,7 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 					// Send rejection message to joiner
 					rejectMsg := messages.MakeHandshakeRejected()
 					self.Conn.WriteToUDP(rejectMsg.SerializeMessage(), rem)
-					netio.VerboseEventLog("Joiner rejected, sent HANDSHAKE_REJECTED message", nil)
+					netio.VerboseEventLog("PokeProtocol: Host Peer rejected connection, sent HANDSHAKE_REJECTED to Joiner Peer", nil)
 				}
 			}
 		}
@@ -93,7 +94,7 @@ func handshake(self peer.PeerDescriptor, join peer.PeerDescriptor) int {
 	self.Conn.WriteToUDP(msg.SerializeMessage(), join.Addr)
 
 	netio.VerboseEventLog(
-		"The match is accepted, sent a "+messages.HandshakeResponse+" message to "+join.Name,
+		"PokeProtocol: Host Peer sent HANDSHAKE_RESPONSE with seed to Joiner Peer '"+join.Name+"'",
 		&netio.LogOptions{
 			MessageParams: msg.MessageParams,
 		},

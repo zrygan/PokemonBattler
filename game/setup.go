@@ -50,17 +50,28 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 	var err error
 	var ok bool
 
+	// Get trainer name for profiles
+	trainerName := netio.PRLine("Enter your trainer name: ")
+	teamManager := poke.NewTeamManager(trainerName)
+
+	// Option to view existing profiles
+	fmt.Println("\nWould you like to view your saved Pokemon profiles? (y/n)")
+	viewProfiles := netio.PRLine("> ")
+	if strings.ToLower(strings.TrimSpace(viewProfiles)) == "y" {
+		teamManager.ListProfiles()
+	}
+
 	// get pokemon name
-	var poke poke.Pokemon
+	var pokemonStruct poke.Pokemon
 	for {
 		pokeName := netio.PRLine("Select a pokemon: ")
 		// Try exact match first, then case-insensitive
-		poke, ok = monsters.MONSTERS[pokeName]
+		pokemonStruct, ok = monsters.MONSTERS[pokeName]
 		if !ok {
 			// Try case-insensitive search
 			for key, mon := range monsters.MONSTERS {
 				if strings.EqualFold(key, pokeName) {
-					poke = mon
+					pokemonStruct = mon
 					ok = true
 					break
 				}
@@ -71,6 +82,13 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 		} else {
 			break
 		}
+	}
+
+	// Customize Pokemon (nickname & personality)
+	profile, err := teamManager.CustomizePokemon(&pokemonStruct)
+	if err != nil {
+		fmt.Printf("Warning: Could not customize Pokemon: %v\n", err)
+		profile = poke.NewPokemonProfile(pokemonStruct.Name)
 	}
 
 	// allocate spatk and spdef
@@ -99,9 +117,10 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 
 	return player.Player{
 		Peer:                   self,
-		PokemonStruct:          poke,
+		PokemonStruct:          pokemonStruct,
 		SpecialAttackUsesLeft:  spatk,
 		SpecialDefenseUsesLeft: spdef,
+		Profile:                profile,
 	}
 }
 
@@ -124,7 +143,7 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, sp
 	}
 
 	netio.VerboseEventLog(
-		"Sent "+messages.BattleSetup+" message to "+other.Name,
+		"PokeProtocol: Peer sent BATTLE_SETUP message to '"+other.Name+"'",
 		&netio.LogOptions{
 			MessageParams: msg.MessageParams,
 		},
@@ -144,7 +163,7 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, sp
 			addr.IP.Equal(other.Addr.IP) && // ensure we got it from expected user
 			addr.Port == other.Addr.Port {
 			netio.VerboseEventLog(
-				"Received a "+messages.BattleSetup+" from "+other.Addr.String(),
+				"PokeProtocol: Peer received BATTLE_SETUP from '"+other.Addr.String()+"'",
 				&netio.LogOptions{
 					MessageParams: res.MessageParams,
 				},

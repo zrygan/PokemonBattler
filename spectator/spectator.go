@@ -96,7 +96,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 			discoveredHosts[hostName] = host
 
 			netio.VerboseEventLog(
-				"Found a HOST, received a "+messages.MMB_HOSTING+" message",
+				"PokeProtocol: Spectator Peer discovered available Host Peer '"+hostName+"'",
 				&netio.LogOptions{
 					Name: hostName,
 					Port: fmt.Sprint(hostPort),

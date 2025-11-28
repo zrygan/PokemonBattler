@@ -86,6 +86,12 @@ func RunBattle(
 	game.State = StateWaitingForMove
 
 	fmt.Println("\n=== BATTLE START ===")
+
+	// Show personality flavor text if profile exists
+	if selfPlayer.Profile != nil {
+		poke.ShowPreBattleMessage(selfPlayer.Profile)
+	}
+
 	fmt.Printf("Your Pokemon: %s (HP: %d/%d)\n",
 		selfPlayer.PokemonStruct.Name,
 		selfPlayer.PokemonStruct.HP,
@@ -303,6 +309,12 @@ func RunBattle(
 			selfPlayer.PokemonStruct.HP,
 			selfPlayer.PokemonStruct.MaxHP)
 
+		// Show low HP warning if HP is below 30%
+		hpPercent := float64(selfPlayer.PokemonStruct.HP) / float64(selfPlayer.PokemonStruct.MaxHP)
+		if hpPercent < 0.3 && hpPercent > 0 && selfPlayer.Profile != nil {
+			poke.ShowLowHealthMessage(selfPlayer.Profile)
+		}
+
 		// Check if self fainted
 		if IsFainted(&selfPlayer.PokemonStruct) {
 			game.State = StateGameOver
@@ -368,6 +380,21 @@ exitBattle:
 		fmt.Printf("%d. %s\n", i+1, entry)
 	}
 	fmt.Println()
+
+	// Update Pokemon profiles after battle
+	if selfPlayer.Profile != nil {
+		won := winner == selfPlayer.Peer.Name
+
+		// Get trainer name from profile or peer
+		trainerName := selfPlayer.Peer.Name
+		teamManager := poke.NewTeamManager(trainerName)
+
+		// Update profile with battle results
+		err := teamManager.UpdateProfileAfterBattle(selfPlayer.Profile, won)
+		if err != nil {
+			fmt.Printf("Warning: Could not save profile: %v\n", err)
+		}
+	}
 }
 
 // ListenForMessages is a helper goroutine that can listen for async messages like chat.
