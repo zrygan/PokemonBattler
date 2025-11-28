@@ -1,104 +1,249 @@
-# PokemonBattler
+# 🎮 PokemonBattler
 
-A peer-to-peer Pokemon battle simulator implementing the PokeProtocol over UDP.
+A feature-rich, peer-to-peer Pokemon battle simulator implementing a custom PokeProtocol over UDP with personality-driven Pokemon companions.
 
-## Features
+## ✨ Features
 
+### 🔥 Core Battle System
 - **Turn-based Pokemon battles** between two players over a network
-- **UDP-based protocol** with custom reliability layer (ACKs and retransmission)
-- **Type effectiveness system** for all 18 Pokemon types
-- **Physical and Special attack distinction** with stat boost system
-- **803 Pokemon** loaded from CSV database
-- **Chat functionality** with text messages and sticker support
-- **Spectator mode** for observing battles
-- **P2P and Broadcast communication modes**
+- **UDP-based PokeProtocol** with custom reliability layer (ACKs and retransmission)
+- **Complete type effectiveness system** for all 18 Pokemon types
+- **Physical vs Special attack mechanics** with consumable stat boost system
+- **803 Pokemon** loaded from comprehensive CSV database
+- **Synchronized damage calculation** using seeded RNG for fair play
 
-## Quick Start
+### 💬 Communication & Social
+- **Real-time chat functionality** with text messages and sticker support
+- **Spectator mode** for observing battles in real-time
+- **P2P and Broadcast communication modes** for flexible network setups
+- **24 built-in stickers** (/smile, /gg, /attack, /defend, etc.)
+
+### 🎭 **Pokemon Personality & Profile System** ⭐ *NEW!*
+- **Custom nicknames** with emoji support (name your Pikachu "Sparky⚡")
+- **8 unique personalities** with distinct battle flavor text (Brave, Timid, Jolly, etc.)
+- **Friendship system** that grows with each battle (0-100 scale)
+- **Battle statistics tracking** (wins, losses, win rate per Pokemon)
+- **Persistent profiles** saved locally and loaded automatically
+- **Personality-based flavor text** during battles for immersive experience
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Go 1.21 or higher
+- **Go 1.21+** 
 - Two machines on the same network (or two terminals for local testing)
 
-### Running a Battle
+### 🎯 Running a Battle
 
 **Terminal 1 (Host):**
-```powershell
-go run .\host\host.go
+```bash
+go run ./host/host.go
 ```
 
 **Terminal 2 (Joiner):**
-```powershell
-go run .\joiner\joiner.go
+```bash
+go run ./joiner/joiner.go
 ```
 
-Follow the prompts to:
-1. Select Pokemon
-2. Allocate stat boosts (10 points total)
-3. Battle!
+**Terminal 3 (Spectator - Optional):**
+```bash
+go run ./spectator/spectator.go
+```
 
-## Project Structure
+### 📋 Battle Setup Flow
+1. **Enter your trainer name** (used for Pokemon profiles)
+2. **View existing Pokemon profiles** (optional)
+3. **Select your Pokemon** from 803 available
+4. **Customize Pokemon** with nickname and personality
+5. **Allocate stat boosts** (10 points between Special Attack/Defense)
+6. **Battle begins!** Host goes first
+
+### 🎮 During Battle
+- Select moves (1-4) and decide on stat boost usage
+- **Chat anytime** with `chat <message>` or use stickers like `/gg`
+- Watch your Pokemon's **personality shine** through flavor text
+- See **real-time friendship updates** after each battle
+
+## 📁 Project Structure
 
 ```
 PokemonBattler/
-├── chat/           - Chat and sticker handling
-├── data/           - Pokemon database (CSV)
-├── game/           - Battle engine and logic
-├── host/           - Host application
-├── joiner/         - Joiner application
-├── messages/       - Protocol message types
-├── reliability/    - UDP reliability layer
-├── poke/           - Pokemon data structures
-└── docs/           - Documentation
+├── 🎯 Applications
+│   ├── host/           - Host application (battle coordinator)
+│   ├── joiner/         - Joiner application (battle participant)
+│   └── spectator/      - Spectator mode (battle observer)
+├── 🎮 Game Engine
+│   ├── game/           - Battle engine and core logic
+│   │   ├── player/     - Player data structures
+│   │   ├── battle.go   - Damage calculation & mechanics
+│   │   ├── battle_flow.go - Turn-based battle flow
+│   │   ├── battle_runner.go - Main battle loop
+│   │   └── setup.go    - Game setup functions
+├── 🐾 Pokemon System
+│   ├── poke/           - Pokemon data structures & profiles
+│   │   ├── mons/       - Pokemon database loader
+│   │   ├── personality.go - NEW: Personality system
+│   │   ├── team_manager.go - NEW: Profile management
+│   │   └── types.go    - Pokemon & move definitions
+├── 📡 Networking
+│   ├── messages/       - Protocol message definitions
+│   ├── netio/          - Network I/O utilities
+│   ├── peer/           - Peer connection management
+│   └── reliability/    - UDP reliability layer
+├── 💾 Data & Config
+│   ├── data/           - Pokemon CSV database
+│   ├── profiles/       - Pokemon profiles (auto-generated)
+│   └── docs/           - Documentation
+└── 💬 Communication
+    └── chat/           - Chat and sticker handling
 ```
 
-## Protocol Overview
+## 🔧 Protocol Overview
 
-The PokeProtocol implements:
-- **Handshaking** for connection establishment
-- **Battle Setup** for Pokemon selection and configuration
-- **Turn Flow**: ATTACK_ANNOUNCE → DEFENSE_ANNOUNCE → CALCULATION_REPORT → CALCULATION_CONFIRM
-- **Damage Calculation** synchronized using seeded RNG
-- **Chat Messages** for communication during battle
-
-See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for complete details.
-
-## Documentation
-
-- [Implementation Guide](docs/IMPLEMENTATION.md) - Complete technical documentation
-- [Protocol Specification](docs/RFC.md) - Full protocol RFC (if available)
-
-## Example Battle Flow
-
+### Core PokeProtocol Messages
 ```
-1. Host starts and listens for joiners
-2. Joiner broadcasts discovery message
-3. Host responds with hosting announcement
-4. Joiner selects host and sends handshake request
-5. Host accepts and sends handshake response with seed
-6. Both players select Pokemon and allocate stat boosts
-7. Battle begins (host goes first)
-8. Turn-based combat with synchronized damage calculation
-9. Battle ends when a Pokemon faints
+HANDSHAKE_REQUEST ↔️ HANDSHAKE_RESPONSE
+BATTLE_SETUP → BATTLE_SETUP
+ATTACK_ANNOUNCE → DEFENSE_ANNOUNCE → CALCULATION_REPORT → CALCULATION_CONFIRM
+CHAT_MESSAGE (async)
+GAME_OVER
 ```
 
-## Development
+### Reliability Features
+- **Sequence numbering** for all messages
+- **Automatic ACK system** with retransmission
+- **Timeout handling** (500ms default)
+- **Connection loss detection**
 
-### Building
-```powershell
-# Build host
-go build -o host.exe .\host\host.go
+## 🎭 Pokemon Personalities
 
-# Build joiner
-go build -o joiner.exe .\joiner\joiner.go
+| Personality | Battle Start | Low HP | Victory |
+|-------------|--------------|--------|---------|
+| **Brave** | "looks determined!" | "refuses to give up!" | "stands victorious!" |
+| **Timid** | "nervously takes field..." | "looks frightened..." | "surprised by victory!" |
+| **Jolly** | "bounces excitedly!" | "still hanging in there!" | "jumps for joy!" |
+| **Sassy** | "struts confidently!" | "maintains composure..." | "strikes victory pose!" |
+| **Serious** | "focuses intently..." | "analyzes situation..." | "nods with satisfaction" |
+| **Calm** | "enters peacefully..." | "remains composed..." | "smiles quietly" |
+| **Playful** | "prances around!" | "still wants to play!" | "celebrates playfully!" |
+| **Proud** | "holds head high!" | "maintains dignity..." | "basks in glory!" |
+
+## 🛠️ Development
+
+### Building Applications
+```bash
+# Build all applications
+go build -o pokemonbattler.exe .
+
+# Build individually
+go build -o host.exe ./host/host.go
+go build -o joiner.exe ./joiner/joiner.go
+go build -o spectator.exe ./spectator/spectator.go
 ```
 
-### Testing
-Run host and joiner in separate terminals or on different machines on the same network.
+### Running Tests
+```bash
+# Test compilation
+go build .
 
-## License
+# Run with verbose logging
+go run ./host/host.go -verbose
+```
 
-[Add your license here]
+## 📖 Documentation
 
-## Contributors
+| Document | Description |
+|----------|-------------|
+| [📋 Implementation Guide](docs/IMPLEMENTATION.md) | Complete technical documentation |
+| [🎭 Pokemon Personality System](docs/POKEMON_PERSONALITY.md) | Personality system deep-dive |
+| [📊 Feature Summary](FEATURE_SUMMARY.md) | Quick feature overview |
+| [🎨 Feature Diagram](docs/FEATURE_DIAGRAM.txt) | Visual system flow |
 
-[Add contributors here]
+## 🎯 Example Battle Session
+
+```
+=== HOST TERMINAL ===
+Welcome to PokeBattler
+What is your trainer name? Ash
+
+📚 Your Pokemon Profiles:
+=== Sparky (Pikachu) ===
+Personality: Jolly
+Friendship: 85/100 (Great Friends)
+Battle Record: 12-3 (80.0% win rate)
+
+Select a pokemon: Pikachu
+🎉 Welcome back! Found existing profile!
+
+=== BATTLE START ===
+Sparky bounces excitedly onto the battlefield!
+Your Pokemon: Sparky (HP: 100/100)
+
+Your turn!
+Select move: 1. Thunderbolt
+Sparky used Thunderbolt! Dealt 45 damage.
+
+⚠️ Sparky is hanging in there!
+🎊 Victory! Sparky jumps for joy!
+Sparky gained friendship! (+5)
+
+Battle Record: 13-3 (81.3% win rate)
+```
+
+## 🎮 Chat Commands & Stickers
+
+### Text Chat
+```
+chat Hello! Good luck!
+chat That was a great move!
+```
+
+### Stickers
+```
+/smile   →  :)
+/gg      →  ASCII "GG"
+/fire    →  (~)
+/attack  →  >>--->>
+/defend  →  [SHIELD]
+/lucky   →  Lucky!
+/ouch    →  Ouch!
+```
+
+## 🏆 Advanced Features
+
+- **Friendship Levels**: Strangers → Acquaintances → Friends → Good Friends → Great Friends → Best Friends
+- **Battle Statistics**: Individual Pokemon win/loss tracking
+- **Profile Persistence**: Automatic save/load across sessions  
+- **Type Effectiveness**: Complete 18-type interaction matrix
+- **Stat Boost Strategy**: Consumable Special Attack/Defense boosts
+- **Spectator Broadcasting**: Real-time battle observation
+- **Cross-platform**: Works on Windows, macOS, Linux
+
+## 🐛 Troubleshooting
+
+### Common Issues
+- **Port conflicts**: Application auto-increments ports if busy
+- **Profile errors**: Check `profiles/` directory permissions
+- **Network issues**: Ensure both machines on same subnet
+- **Pokemon not found**: Check spelling (case-insensitive search available)
+
+### Debug Commands
+```bash
+# Verbose logging
+go run ./host/host.go -v
+
+# Check network connectivity
+ping [opponent_ip]
+
+# List profiles
+ls profiles/
+```
+
+### Declaration of AI Use
+
+The following Generative AI (GenAI) tools were used: Claude Sonnet 4. These were used for generating in-code documentation and populate this README documentation, explaning code, exploring Go's network library with required functions or functionalities, and debugging. All the codes are manually tested and verified by the author.
+
+### References
+
+> This project does not use any implementations outside of Go's standard library.
+
+The Go Programming Language. go.dev.
