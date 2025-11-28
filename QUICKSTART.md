@@ -281,6 +281,25 @@ Opponent's Pokemon fainted! You win!
 
 ## Troubleshooting
 
+### Port Auto-Increment
+If a port is already in use (e.g., from a previous instance that didn't fully close), the application will automatically try the next available port:
+
+```
+Port 50000 was in use, automatically using port 50001 instead.
+```
+
+This happens automatically for all applications (host, joiner, spectator). The application will try up to 10 consecutive ports before giving up.
+
+**Why this happens:**
+- Previous instance still running
+- Port not released by OS yet
+- Another application using the port
+
+**What to do:**
+- Nothing! The application handles it automatically
+- Note the new port number if manually connecting
+- If verbose mode is enabled, you'll see which port was chosen
+
 ### "Pokemon not found"
 - Check spelling (case-sensitive!)
 - Try: Pikachu, Charizard, Mewtwo, Gengar

@@ -35,15 +35,62 @@ func MakePDFromLogin(userType string) PeerDescriptor {
 
 // MakePDBase creates a PeerDescriptor with the specified parameters.
 // If isLocal is true, it creates a listening UDP connection; otherwise, it creates a remote descriptor.
+// For local connections, if the port is already in use, it automatically tries incrementing ports
+// (up to 10 attempts) until a free port is found.
 func MakePDBase(name, ip, port string, isLocal bool) PeerDescriptor {
-	addr, err := net.ResolveUDPAddr("udp", ip+":"+port)
-	if err != nil {
-		panic(err)
-	}
-
+	originalPort := port
+	var addr *net.UDPAddr
 	var conn *net.UDPConn
+	var err error
+
 	if isLocal {
-		conn, err = net.ListenUDP("udp", addr)
+		// Try up to 10 ports starting from the requested port
+		maxAttempts := 10
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			addr, err = net.ResolveUDPAddr("udp", ip+":"+port)
+			if err != nil {
+				panic(err)
+			}
+
+			conn, err = net.ListenUDP("udp", addr)
+			if err == nil {
+				// Successfully bound to port
+				if port != originalPort {
+					netio.VerboseEventLog(
+						"Port "+originalPort+" was in use, automatically using port "+port+" instead.",
+						&netio.LogOptions{
+							Port: port,
+							IP:   ip,
+						},
+					)
+				}
+				break
+			}
+
+			// Port in use, try next port
+			portNum, convErr := strconv.Atoi(port)
+			if convErr != nil {
+				// If port is "0" or invalid, let OS choose
+				port = "0"
+				addr, err = net.ResolveUDPAddr("udp", ip+":"+port)
+				if err != nil {
+					panic(err)
+				}
+				conn, err = net.ListenUDP("udp", addr)
+				if err != nil {
+					panic(err)
+				}
+				break
+			}
+			port = strconv.Itoa(portNum + 1)
+		}
+
+		if conn == nil {
+			panic("failed to bind to any port after " + strconv.Itoa(maxAttempts) + " attempts starting from " + originalPort)
+		}
+	} else {
+		// Remote descriptor, no binding needed
+		addr, err = net.ResolveUDPAddr("udp", ip+":"+port)
 		if err != nil {
 			panic(err)
 		}
