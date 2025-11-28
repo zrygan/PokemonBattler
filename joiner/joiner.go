@@ -29,7 +29,7 @@ func lookForMatch() map[string]string {
 	// This allows discovery of hosts that auto-incremented to different ports
 	msg := messages.MakeJoiningMMB()
 	msgBytes := msg.SerializeMessage()
-	
+
 	for port := 50000; port <= 50010; port++ {
 		bAddr := net.UDPAddr{
 			IP:   net.IPv4bcast, // 255.255.255.255

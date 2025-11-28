@@ -53,7 +53,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	// This allows discovery of hosts that auto-incremented to different ports
 	discoveryMsg := messages.MakeJoiningMMB()
 	msgBytes := discoveryMsg.SerializeMessage()
-	
+
 	for port := 50000; port <= 50010; port++ {
 		broadcastAddr := &net.UDPAddr{
 			IP:   net.IPv4bcast,
