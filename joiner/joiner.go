@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"strings"
@@ -175,6 +176,13 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 // main is the entry point for the joiner application.
 // It discovers hosts, allows user selection, and initiates the handshake process.
 func main() {
+	// Parse command-line flags
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging of network events")
+	flag.Parse()
+
+	// Set global verbose mode
+	netio.Verbose = *verboseFlag
+
 	self := peer.MakePDFromLogin("joiner")
 	defer self.Conn.Close()
 

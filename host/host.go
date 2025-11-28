@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"strings"
 
 	"github.com/zrygan/pokemonbattler/game"
@@ -108,6 +109,13 @@ func handshake(self peer.PeerDescriptor, join peer.PeerDescriptor) int {
 // main is the entry point for the host application.
 // It initializes the host, waits for a joiner, performs handshake, and starts the battle.
 func main() {
+	// Parse command-line flags
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging of network events")
+	flag.Parse()
+
+	// Set global verbose mode
+	netio.Verbose = *verboseFlag
+
 	self := peer.MakePDFromLogin("hostW")
 	defer self.Conn.Close()
 

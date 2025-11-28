@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"time"
@@ -12,6 +13,13 @@ import (
 )
 
 func main() {
+	// Parse command-line flags
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging of network events")
+	flag.Parse()
+
+	// Set global verbose mode
+	netio.Verbose = *verboseFlag
+
 	fmt.Println("Welcome to PokeBattler - Spectator Mode")
 	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")
 	fmt.Println()

@@ -4,8 +4,9 @@ import (
 	"fmt"
 )
 
-// verbose controls whether verbose logging is enabled globally.
-const verbose bool = true
+// Verbose controls whether verbose logging is enabled globally.
+// Can be set via command-line flags in main applications.
+var Verbose bool = false
 
 // LogOptions contains optional parameters for verbose logging.
 // Used to display detailed information about network events and messages.
@@ -23,7 +24,7 @@ type LogOptions struct {
 // VerboseEventLog logs detailed information about network events when verbose mode is enabled.
 // Takes a message string and optional LogOptions for additional context.
 func VerboseEventLog(message string, opts *LogOptions) {
-	if !verbose {
+	if !Verbose {
 		return
 	}
 
