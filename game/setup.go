@@ -150,6 +150,18 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, sp
 				},
 			)
 
+			// Relay joiner's BATTLE_SETUP to spectators (host only)
+			if len(spectators) > 0 {
+				msgBytes := res.SerializeMessage()
+				for _, spec := range spectators {
+					self.Peer.Conn.WriteToUDP(msgBytes, spec.Addr)
+				}
+				netio.VerboseEventLog(
+					"Relayed joiner's BATTLE_SETUP to "+strconv.Itoa(len(spectators))+" spectator(s)",
+					nil,
+				)
+			}
+
 			// Parse opponent's Pokemon data from the message
 			params := *res.MessageParams
 			opponentPokemonName := params["pokemon_name"].(string)
