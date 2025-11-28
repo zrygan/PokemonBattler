@@ -37,7 +37,7 @@ func RunBattle(
 	}
 
 	if len(spectators) > 0 {
-		fmt.Printf("\n👀 %d spectator(s) watching this battle\n", len(spectators))
+		fmt.Printf("\n%d spectator(s) watching this battle\n", len(spectators))
 	}
 
 	// Create reliable connection
@@ -67,7 +67,7 @@ func RunBattle(
 	}
 	fmt.Printf("\nSpecial Attack Boosts: %d\n", selfPlayer.SpecialAttackUsesLeft)
 	fmt.Printf("Special Defense Boosts: %d\n", selfPlayer.SpecialDefenseUsesLeft)
-	fmt.Println("\n💬 Tip: Type 'chat <message>' at any prompt to send a chat message!")
+	fmt.Println("\nTip: Type 'chat <message>' at any prompt to send a chat message!")
 	fmt.Println()
 
 	// Battle loop
@@ -281,5 +281,5 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	// Broadcast to spectators
 	game.BroadcastToSpectators(msgBytes)
 
-	fmt.Printf("💬 You: %s\n", messageText)
+	fmt.Printf("You: %s\n", messageText)
 }

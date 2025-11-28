@@ -6,6 +6,7 @@ import (
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
+	"github.com/zrygan/pokemonbattler/peer"
 	"github.com/zrygan/pokemonbattler/poke"
 	"github.com/zrygan/pokemonbattler/reliability"
 )
@@ -158,12 +159,21 @@ func (bc *BattleContext) calculateDamage(
 func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, error) {
 	buf := make([]byte, 65535)
 	for {
-		n, _, err := bc.SelfPlayer.Peer.Conn.ReadFromUDP(buf)
+		n, addr, err := bc.SelfPlayer.Peer.Conn.ReadFromUDP(buf)
 		if err != nil {
 			return nil, err
 		}
 
 		msg := messages.DeserializeMessage(buf[:n])
+
+		// Handle spectators joining mid-battle (host only)
+		if msg.MessageType == messages.SpectatorRequest && bc.IsHost {
+			spectatorName := "Spectator" + addr.String()
+			spectator := peer.MakePD(spectatorName, nil, addr)
+			bc.Game.AddSpectator(spectator)
+			fmt.Printf("\nNew spectator joined: %s\n", addr.String())
+			continue // Keep waiting for the actual battle message
+		}
 
 		// Ignore chat messages - they're handled by background listener
 		if msg.MessageType == messages.ChatMessage {
@@ -174,9 +184,9 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 
 			if contentType == "TEXT" {
 				messageText := params["message_text"].(string)
-				fmt.Printf("\n💬 [%s]: %s\n", senderName, messageText)
+				fmt.Printf("\n[%s]: %s\n", senderName, messageText)
 			} else if contentType == "STICKER" {
-				fmt.Printf("\n🎨 [%s]: <sent a sticker>\n", senderName)
+				fmt.Printf("\n[%s]: <sent a sticker>\n", senderName)
 			}
 
 			// Relay chat message to spectators (host only)

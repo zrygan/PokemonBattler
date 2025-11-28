@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/zrygan/pokemonbattler/messages"
@@ -36,7 +37,7 @@ func main() {
 	}
 
 	// Send spectator request
-	fmt.Printf("\n🔴 LOG :: Requesting to spectate %s's battle\n", host.Name)
+	fmt.Printf("\nLOG :: Requesting to spectate %s's battle\n", host.Name)
 	spectatorReq := messages.MakeSpectatorRequest()
 	self.Conn.WriteToUDP(spectatorReq.SerializeMessage(), host.Addr)
 
@@ -45,8 +46,8 @@ func main() {
 }
 
 func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
-	fmt.Println("🔍 Searching for active battles...")
-	fmt.Println("Listening for 5 seconds...")
+	fmt.Println("Searching for active battles...")
+	fmt.Println("Listening for 3 seconds...")
 	fmt.Println()
 
 	// Broadcast to multiple ports to discover hosts (50000-50010)
@@ -63,11 +64,11 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	}
 
 	// Listen for responses
-	self.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	self.Conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	defer self.Conn.SetReadDeadline(time.Time{})
 
 	buf := make([]byte, 1024)
-	var hosts []peer.PeerDescriptor
+	discoveredHosts := make(map[string]peer.PeerDescriptor)
 
 	for {
 		n, addr, err := self.Conn.ReadFromUDP(buf)
@@ -77,38 +78,66 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 
 		msg := messages.DeserializeMessage(buf[:n])
 		if msg.MessageType == messages.MMB_HOSTING {
+			hostName := (*msg.MessageParams)["name"].(string)
 			host := peer.PeerDescriptor{
-				Name: (*msg.MessageParams)["name"].(string),
+				Name: hostName,
 				Addr: addr,
 			}
-			hosts = append(hosts, host)
-			fmt.Printf("📡 Found battle: %s @ %s:%d\n", host.Name, addr.IP, addr.Port)
+			discoveredHosts[hostName] = host
+
+			netio.VerboseEventLog(
+				"Found a HOST, received a "+messages.MMB_HOSTING+" message",
+				&netio.LogOptions{
+					Name: hostName,
+					Port: fmt.Sprint(addr.Port),
+					IP:   addr.IP.String(),
+				},
+			)
 		}
 	}
 
-	if len(hosts) == 0 {
+	fmt.Println("Discovered Hosts")
+	for name, host := range discoveredHosts {
+		fmt.Printf("\t%s @ %s:%d\n", name, host.Addr.IP, host.Addr.Port)
+	}
+	fmt.Println()
+
+	if len(discoveredHosts) == 0 {
 		return nil
 	}
 
-	// Select host
-	fmt.Println("\nAvailable Battles:")
-	for i, h := range hosts {
-		fmt.Printf("%d. %s @ %s:%d\n", i+1, h.Name, h.Addr.IP, h.Addr.Port)
-	}
-
+	// Select host by name
 	for {
-		input := netio.PRLine("\nSelect battle to spectate (enter number): ")
-		var idx int
-		_, err := fmt.Sscanf(input, "%d", &idx)
-		if err == nil && idx > 0 && idx <= len(hosts) {
-			return &hosts[idx-1]
+		hostName := netio.PRLine("Select a host to spectate... (or type /R to search again)")
+
+		// Check for restart command (case-insensitive)
+		if strings.ToUpper(hostName) == "/R" {
+			return discoverHost(self) // Recursively restart discovery
 		}
-		fmt.Println("Invalid selection. Try again.")
+
+		// Try exact match first, then case-insensitive
+		host, ok := discoveredHosts[hostName]
+		if !ok {
+			// Try case-insensitive search
+			for key, val := range discoveredHosts {
+				if strings.EqualFold(key, hostName) {
+					host = val
+					ok = true
+					break
+				}
+			}
+		}
+
+		if ok {
+			return &host
+		}
+
+		fmt.Println("Host name not found. Try again.")
 	}
 }
 
 func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
-	fmt.Println("\n🎮 === SPECTATING BATTLE ===")
+	fmt.Println("\n=== SPECTATING BATTLE ===")
 	fmt.Println("You are now observing the battle. Press Ctrl+C to exit.")
 	fmt.Println()
 
@@ -146,7 +175,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 						joinerMaxHP = mon.HP
 					}
 					battleStarted = true
-					fmt.Printf("\n⚔️  BATTLE: %s vs %s\n", hostPokemon, joinerPokemon)
+					fmt.Printf("\nBATTLE: %s vs %s\n", hostPokemon, joinerPokemon)
 					fmt.Printf("   %s: %d/%d HP\n", hostPokemon, hostHP, hostMaxHP)
 					fmt.Printf("   %s: %d/%d HP\n\n", joinerPokemon, joinerHP, joinerMaxHP)
 				}
@@ -155,7 +184,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 		case messages.AttackAnnounce:
 			params := *msg.MessageParams
 			moveName := params["move_name"].(string)
-			fmt.Printf("⚡ Attack announced: %s\n", moveName)
+			fmt.Printf("Attack announced: %s\n", moveName)
 
 		case messages.CalculationReport:
 			params := *msg.MessageParams
@@ -165,7 +194,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			defenderHP := params["defender_hp_remaining"].(int)
 			statusMsg := params["status_message"].(string)
 
-			fmt.Printf("\n📊 %s used %s!\n", attacker, moveName)
+			fmt.Printf("\n%s used %s!\n", attacker, moveName)
 			fmt.Printf("   Damage: %d\n", damage)
 
 			// Update HP tracking
@@ -185,7 +214,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			winner := params["winner"].(string)
 			loser := params["loser"].(string)
 
-			fmt.Printf("\n🏆 === BATTLE END ===\n")
+			fmt.Printf("\n=== BATTLE END ===\n")
 			fmt.Printf("Winner: %s\n", winner)
 			fmt.Printf("Loser: %s\n", loser)
 			fmt.Println("\nBattle has ended. Press Ctrl+C to exit.")
@@ -201,9 +230,9 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 
 			if contentType == "TEXT" {
 				text := params["message_text"].(string)
-				fmt.Printf("💬 [%s]: %s\n", sender, text)
+				fmt.Printf("[%s]: %s\n", sender, text)
 			} else if contentType == "STICKER" {
-				fmt.Printf("🎨 [%s]: <sent a sticker>\n", sender)
+				fmt.Printf("[%s]: <sent a sticker>\n", sender)
 			}
 		}
 	}
