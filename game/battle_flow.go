@@ -224,7 +224,7 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 					switch bc.Game.CommunicationMode {
 					case "P": // P2P mode - spectator messages stay with spectators only
 						bc.broadcastToSpectators(buf[:n])
-					case "B": // Broadcast mode - relay to joiner AND other spectators  
+					case "B": // Broadcast mode - relay to joiner AND other spectators
 						bc.SelfPlayer.Peer.Conn.WriteToUDP(buf[:n], bc.OpponentAddr)
 						bc.broadcastToSpectators(buf[:n])
 					default: // Default to P2P behavior
