@@ -30,3 +30,22 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Pokemon Battler specific
+profiles/
+*.json
+pokemonbattler.exe
+pokemonbattler
+host.exe
+joiner.exe
+spectator.exe
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Binary files
+bin/
