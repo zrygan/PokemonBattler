@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -11,6 +12,34 @@ import (
 	"github.com/zrygan/pokemonbattler/poke"
 	"github.com/zrygan/pokemonbattler/reliability"
 )
+
+// Predefined stickers mapping
+var Stickers = map[string]string{
+	"/smile":      ":)",
+	"/laugh":      "LOL",
+	"/cool":       "B)",
+	"/angry":      ">:(",
+	"/sad":        ":(",
+	"/love":       "<3",
+	"/fire":       "(~)",
+	"/star":       "*",
+	"/thumbsup":   "(Y)",
+	"/thumbsdown": "(N)",
+	"/hi":         "o/",
+	"/bye":        "\\o",
+	"/gg":         "  ___  ___ \n / __|/ __|\n| (_ | (_ |\n \\___|\\___|",
+	"/nice":       "Nice!",
+	"/wow":        "WOW!",
+	"/ouch":       "Ouch!",
+	"/lucky":      "Lucky!",
+	"/unlucky":    "Unlucky!",
+	"/attack":     ">>--->>",
+	"/defend":     "[SHIELD]",
+	"/heal":       "+HP+",
+	"/critical":   "***CRIT***",
+	"/miss":       "X MISS X",
+	"/hit":        "[HIT!]",
+}
 
 // RunBattle starts and manages the complete battle loop.
 func RunBattle(
@@ -65,9 +94,11 @@ func RunBattle(
 		fmt.Printf("%d. %s (Power: %.0f, Type: %s, Category: %s)\n",
 			i+1, move.Name, move.BasePower, move.Type, move.DamageCategory)
 	}
-	fmt.Printf("\nSpecial Attack Boosts: %d\n", selfPlayer.SpecialAttackUsesLeft)
+	fmt.Printf("Special Attack Boosts: %d\n", selfPlayer.SpecialAttackUsesLeft)
 	fmt.Printf("Special Defense Boosts: %d\n", selfPlayer.SpecialDefenseUsesLeft)
-	fmt.Println("\nTip: Type 'chat <message>' at any prompt to send a chat message!")
+	fmt.Println("\nTip: Type 'chat <message>' to send a chat message!")
+	fmt.Println("Stickers: /smile /laugh /cool /angry /sad /love /fire /star /thumbsup /hi /gg /nice /wow /ouch /lucky /attack /defend /heal /critical /miss /hit")
+	fmt.Println("Press Enter alone to send a chat message anytime during opponent's turn.")
 	fmt.Println()
 
 	// Battle loop
@@ -93,6 +124,12 @@ func RunBattle(
 				if len(input) > 5 && input[:5] == "chat " {
 					chatText := input[5:]
 					sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+					continue
+				}
+
+				// Check if it's a sticker
+				if strings.HasPrefix(input, "/") {
+					sendChatMessage(selfPlayer, opponentPlayer, game, input)
 					continue
 				}
 
@@ -136,9 +173,39 @@ func RunBattle(
 			}
 		} else {
 			fmt.Println("Opponent's turn... waiting...")
+			fmt.Println("(Type 'chat <message>' or a sticker like '/gg' and press Enter to chat)")
+
+			// Start a goroutine to handle chat input during opponent's turn
+			chatDone := make(chan bool)
+			go func() {
+				for {
+					select {
+					case <-chatDone:
+						return
+					default:
+						input := netio.PRLine("")
+						if len(input) == 0 {
+							continue
+						}
+
+						// Check if it's a chat command
+						if len(input) > 5 && input[:5] == "chat " {
+							chatText := input[5:]
+							sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+						} else if strings.HasPrefix(input, "/") {
+							// Treat as sticker
+							sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						} else {
+							// Treat as regular message
+							sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						}
+					}
+				}
+			}()
 
 			// Process opponent's turn
 			err := battleCtx.ProcessTurn(poke.Move{}, false)
+			chatDone <- true // Stop the chat goroutine
 			if err != nil {
 				if err.Error() == "opponent_fainted" {
 					// This shouldn't happen on defender's turn, but handle it
@@ -262,14 +329,29 @@ func ListenForMessages(
 	}
 }
 
-// sendChatMessage sends a chat message to the opponent and spectators
+// sendChatMessage sends a chat message or sticker to the opponent and spectators
 func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, game *Game, messageText string) {
 	seqNum := 0 // Simple sequence for chat
+
+	// Check if it's a sticker command
+	contentType := "TEXT"
+	stickerID := ""
+	displayText := messageText
+
+	if strings.HasPrefix(messageText, "/") {
+		if stickerText, exists := Stickers[strings.ToLower(messageText)]; exists {
+			contentType = "STICKER"
+			stickerID = messageText
+			displayText = stickerText
+			messageText = "" // Clear message text for stickers
+		}
+	}
+
 	msg := messages.MakeChatMessage(
 		selfPlayer.Peer.Name,
-		"TEXT",
+		contentType,
 		messageText,
-		"",
+		stickerID,
 		seqNum,
 	)
 
@@ -281,5 +363,9 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	// Broadcast to spectators
 	game.BroadcastToSpectators(msgBytes)
 
-	fmt.Printf("You: %s\n", messageText)
+	if contentType == "STICKER" {
+		fmt.Printf("You sent sticker: %s\n", displayText)
+	} else {
+		fmt.Printf("You: %s\n", messageText)
+	}
 }

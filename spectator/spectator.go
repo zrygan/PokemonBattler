@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
 	"github.com/zrygan/pokemonbattler/netio"
 	"github.com/zrygan/pokemonbattler/peer"
@@ -71,7 +72,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	discoveredHosts := make(map[string]peer.PeerDescriptor)
 
 	for {
-		n, addr, err := self.Conn.ReadFromUDP(buf)
+		n, _, err := self.Conn.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
@@ -79,9 +80,18 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 		msg := messages.DeserializeMessage(buf[:n])
 		if msg.MessageType == messages.MMB_HOSTING {
 			hostName := (*msg.MessageParams)["name"].(string)
+			hostIP := fmt.Sprint((*msg.MessageParams)["ip"])
+			hostPort := (*msg.MessageParams)["port"].(int)
+
+			// Create proper address from message params
+			hostAddr := &net.UDPAddr{
+				IP:   net.ParseIP(hostIP),
+				Port: hostPort,
+			}
+
 			host := peer.PeerDescriptor{
 				Name: hostName,
-				Addr: addr,
+				Addr: hostAddr,
 			}
 			discoveredHosts[hostName] = host
 
@@ -89,8 +99,8 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 				"Found a HOST, received a "+messages.MMB_HOSTING+" message",
 				&netio.LogOptions{
 					Name: hostName,
-					Port: fmt.Sprint(addr.Port),
-					IP:   addr.IP.String(),
+					Port: fmt.Sprint(hostPort),
+					IP:   hostIP,
 				},
 			)
 		}
@@ -136,10 +146,72 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	}
 }
 
+// sendSpectatorChat sends a chat message or sticker from spectator to host
+func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messageText string) {
+	seqNum := 0 // Simple sequence for chat
+
+	// Check if it's a sticker command
+	contentType := "TEXT"
+	stickerID := ""
+	displayText := messageText
+
+	if strings.HasPrefix(messageText, "/") {
+		if stickerText, exists := game.Stickers[strings.ToLower(messageText)]; exists {
+			contentType = "STICKER"
+			stickerID = messageText
+			displayText = stickerText
+			messageText = "" // Clear message text for stickers
+		}
+	}
+
+	msg := messages.MakeChatMessage(
+		self.Name,
+		contentType,
+		messageText,
+		stickerID,
+		seqNum,
+	)
+
+	msgBytes := msg.SerializeMessage()
+
+	// Send to host (who will relay to joiner and other spectators)
+	self.Conn.WriteToUDP(msgBytes, host.Addr)
+
+	if contentType == "STICKER" {
+		fmt.Printf("You sent sticker: %s\n", displayText)
+	} else {
+		fmt.Printf("You: %s\n", messageText)
+	}
+}
+
 func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 	fmt.Println("\n=== SPECTATING BATTLE ===")
 	fmt.Println("You are now observing the battle. Press Ctrl+C to exit.")
+	fmt.Println("Type 'chat <message>' or stickers like '/gg' and press Enter to send chat messages!")
 	fmt.Println()
+
+	// Start goroutine to handle chat input from spectator
+	go func() {
+		for {
+			input := netio.PRLine("")
+			if len(input) == 0 {
+				continue
+			}
+
+			// Check if it's a chat command
+			messageText := ""
+			if len(input) > 5 && input[:5] == "chat " {
+				messageText = input[5:]
+			} else if strings.HasPrefix(input, "/") {
+				messageText = input // Treat as sticker
+			} else {
+				messageText = input // Treat as regular message
+			}
+
+			// Send chat message to host
+			sendSpectatorChat(self, *host, messageText)
+		}
+	}()
 
 	buf := make([]byte, 65535)
 
@@ -225,14 +297,22 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 
 		case messages.ChatMessage:
 			params := *msg.MessageParams
-			sender := params["sender_name"].(string)
-			contentType := params["content_type"].(string)
+			sender, _ := params["sender_name"].(string)
+			contentType, _ := params["content_type"].(string)
 
 			if contentType == "TEXT" {
-				text := params["message_text"].(string)
-				fmt.Printf("[%s]: %s\n", sender, text)
+				if text, ok := params["message_text"].(string); ok && text != "" {
+					fmt.Printf("[%s]: %s\n", sender, text)
+				}
 			} else if contentType == "STICKER" {
-				fmt.Printf("[%s]: <sent a sticker>\n", sender)
+				if stickerID, ok := params["sticker_id"].(string); ok && stickerID != "" {
+					// Display sticker with its visual representation
+					if stickerText, exists := game.Stickers[strings.ToLower(stickerID)]; exists {
+						fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
+					} else {
+						fmt.Printf("[%s] sent a sticker\n", sender)
+					}
+				}
 			}
 		}
 	}

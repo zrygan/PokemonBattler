@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -179,18 +180,38 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 		if msg.MessageType == messages.ChatMessage {
 			// Display the chat message inline
 			params := *msg.MessageParams
-			senderName := params["sender_name"].(string)
-			contentType := params["content_type"].(string)
+			senderName, _ := params["sender_name"].(string)
+			contentType, _ := params["content_type"].(string)
 
 			if contentType == "TEXT" {
-				messageText := params["message_text"].(string)
-				fmt.Printf("\n[%s]: %s\n", senderName, messageText)
+				if messageText, ok := params["message_text"].(string); ok && messageText != "" {
+					fmt.Printf("\n[%s]: %s\n", senderName, messageText)
+				}
 			} else if contentType == "STICKER" {
-				fmt.Printf("\n[%s]: <sent a sticker>\n", senderName)
+				if stickerID, ok := params["sticker_id"].(string); ok && stickerID != "" {
+					// Display sticker with its visual representation
+					if stickerText, exists := Stickers[strings.ToLower(stickerID)]; exists {
+						fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+					} else {
+						fmt.Printf("\n[%s] sent a sticker\n", senderName)
+					}
+				}
 			}
 
-			// Relay chat message to spectators (host only)
-			bc.broadcastToSpectators(buf[:n])
+			// Host relays all chat messages
+			if bc.IsHost {
+				// Check if message is from joiner (not from us or spectators)
+				isFromOpponent := addr.IP.Equal(bc.OpponentAddr.IP) && addr.Port == bc.OpponentAddr.Port
+
+				if isFromOpponent {
+					// Message from joiner - relay to spectators only
+					bc.broadcastToSpectators(buf[:n])
+				} else {
+					// Message from spectator - relay to joiner AND other spectators
+					bc.SelfPlayer.Peer.Conn.WriteToUDP(buf[:n], bc.OpponentAddr)
+					bc.broadcastToSpectators(buf[:n])
+				}
+			}
 
 			continue // Keep waiting for the actual battle message
 		}
