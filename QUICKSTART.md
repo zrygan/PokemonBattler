@@ -26,6 +26,11 @@ cd C:\Users\zrgnt\Documents\zrygan\PokemonBattler
 go run .\host\host.go
 ```
 
+**Optional:** Enable verbose logging to see network events:
+```powershell
+go run .\host\host.go -verbose
+```
+
 You'll see:
 ```
 Enter your name: _
@@ -44,6 +49,11 @@ Listening on [your-ip]:50000
 
 ```powershell
 go run .\joiner\joiner.go
+```
+
+**Optional:** Enable verbose logging to see network events:
+```powershell
+go run .\joiner\joiner.go -verbose
 ```
 
 You'll see:
@@ -366,6 +376,62 @@ Once you're comfortable with basic battles:
 
 ---
 
+## Verbose Mode
+
+All applications (host, joiner, and spectator) support verbose logging to help debug network issues or understand the protocol.
+
+### Enabling Verbose Mode
+
+Add the `-verbose` flag when running:
+
+```powershell
+# Host with verbose logging
+go run .\host\host.go -verbose
+
+# Joiner with verbose logging
+go run .\joiner\joiner.go -verbose
+
+# Spectator with verbose logging
+go run .\spectator\spectator.go -verbose
+```
+
+### What Verbose Mode Shows
+
+With verbose mode enabled, you'll see detailed network events:
+
+```
+🔴 LOG :: Found a JOINER, received a MMB_JOINING message
+
+🔴 LOG :: Found a JOINER, sent a MMB_HOSTING message
+	> MessageParams:
+		name: Alice
+		port: 50000
+		ip: 192.168.1.100
+
+🔴 LOG :: Match found, received a HANDSHAKE_REQUEST message from Bob
+	> MessageParams:
+		name: Bob
+	> MessageSender: 192.168.1.101:50001
+```
+
+### When to Use Verbose Mode
+
+- **Debugging:** When connections aren't working properly
+- **Learning:** To understand the protocol message flow
+- **Development:** When testing new features
+- **Network Issues:** To see exactly what packets are being sent/received
+
+### Default Behavior
+
+By default, verbose mode is **OFF**. This means:
+- Clean output focused on battle events
+- No network-level details displayed
+- Better user experience for casual play
+
+To see network details, explicitly enable it with the `-verbose` flag.
+
+---
+
 ## Spectator Mode
 
 Want to watch a battle without playing? Use spectator mode!
@@ -383,6 +449,11 @@ cd C:\Users\zrgnt\Documents\zrygan\PokemonBattler
 
 ```powershell
 go run .\spectator\spectator.go
+```
+
+**Optional:** Enable verbose logging to see network events:
+```powershell
+go run .\spectator\spectator.go -verbose
 ```
 
 You'll see:
