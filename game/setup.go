@@ -50,8 +50,8 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 	var err error
 	var ok bool
 
-	// Get trainer name for profiles
-	trainerName := netio.PRLine("Enter your trainer name: ")
+	// Use trainer name from login for profiles
+	trainerName := self.Name
 	teamManager := poke.NewTeamManager(trainerName)
 
 	// Option to view existing profiles

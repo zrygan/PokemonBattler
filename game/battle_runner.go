@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -154,11 +155,11 @@ func RunBattle(
 					// Check for incoming network messages (chat from opponent)
 					buf := make([]byte, 65535)
 					selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
-					n, _, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
+					n, addr, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
 					if err == nil {
 						msg := messages.DeserializeMessage(buf[:n])
 						if msg.MessageType == messages.ChatMessage {
-							processIncomingChat(msg, isHost, battleCtx, buf[:n])
+							processIncomingChat(msg, isHost, battleCtx, buf[:n], addr)
 						}
 					}
 					selfPlayer.Peer.Conn.SetReadDeadline(time.Time{}) // Clear deadline
@@ -184,11 +185,11 @@ func RunBattle(
 						// Check for incoming network messages
 						buf := make([]byte, 65535)
 						selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
-						n, _, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
+						n, addr, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
 						if err == nil {
 							msg := messages.DeserializeMessage(buf[:n])
 							if msg.MessageType == messages.ChatMessage {
-								processIncomingChat(msg, isHost, battleCtx, buf[:n])
+								processIncomingChat(msg, isHost, battleCtx, buf[:n], addr)
 							}
 						}
 						selfPlayer.Peer.Conn.SetReadDeadline(time.Time{})
@@ -489,7 +490,7 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 }
 
 // processIncomingChat handles and displays incoming chat messages
-func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleContext, msgBytes []byte) {
+func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleContext, msgBytes []byte, senderAddr *net.UDPAddr) {
 	params := *msg.MessageParams
 	senderName, _ := params["sender_name"].(string)
 	contentType, _ := params["content_type"].(string)
@@ -508,8 +509,25 @@ func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleCo
 		}
 	}
 
-	// Host relays chat to spectators
+	// Host relays chat messages according to communication mode
 	if isHost {
-		battleCtx.broadcastToSpectators(msgBytes)
+		// Check if message is from joiner (not from us or spectators)
+		isFromOpponent := senderAddr.IP.Equal(battleCtx.OpponentAddr.IP) && senderAddr.Port == battleCtx.OpponentAddr.Port
+
+		if isFromOpponent {
+			// Message from joiner - always relay to spectators
+			battleCtx.broadcastToSpectators(msgBytes)
+		} else {
+			// Message from spectator - relay according to communication mode
+			switch battleCtx.Game.CommunicationMode {
+			case "P": // P2P mode - spectator messages stay with spectators only
+				battleCtx.broadcastToSpectatorsExcept(msgBytes, senderAddr)
+			case "B": // Broadcast mode - relay to joiner AND other spectators
+				battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+				battleCtx.broadcastToSpectatorsExcept(msgBytes, senderAddr)
+			default: // Default to P2P behavior
+				battleCtx.broadcastToSpectatorsExcept(msgBytes, senderAddr)
+			}
+		}
 	}
 }

@@ -28,6 +28,21 @@ func (bc *BattleContext) broadcastToSpectators(msg []byte) {
 	}
 }
 
+// broadcastToSpectatorsExcept sends a message to all spectators except the specified address
+func (bc *BattleContext) broadcastToSpectatorsExcept(msg []byte, exceptAddr *net.UDPAddr) {
+	if bc.Game.Host == nil || bc.Game.Host.Peer.Conn == nil {
+		return // No host connection available
+	}
+
+	for _, spectator := range bc.Game.Spectators {
+		// Skip the spectator who sent the message
+		if spectator.Addr.IP.Equal(exceptAddr.IP) && spectator.Addr.Port == exceptAddr.Port {
+			continue
+		}
+		bc.Game.Host.Peer.Conn.WriteToUDP(msg, spectator.Addr)
+	}
+}
+
 // sendMessage sends a message according to the communication mode
 func (bc *BattleContext) sendMessage(msg []byte, target peer.PeerDescriptor) {
 	switch bc.Game.CommunicationMode {
@@ -223,12 +238,12 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 					// Message from spectator - relay according to communication mode
 					switch bc.Game.CommunicationMode {
 					case "P": // P2P mode - spectator messages stay with spectators only
-						bc.broadcastToSpectators(buf[:n])
+						bc.broadcastToSpectatorsExcept(buf[:n], addr)
 					case "B": // Broadcast mode - relay to joiner AND other spectators
 						bc.SelfPlayer.Peer.Conn.WriteToUDP(buf[:n], bc.OpponentAddr)
-						bc.broadcastToSpectators(buf[:n])
+						bc.broadcastToSpectatorsExcept(buf[:n], addr)
 					default: // Default to P2P behavior
-						bc.broadcastToSpectators(buf[:n])
+						bc.broadcastToSpectatorsExcept(buf[:n], addr)
 					}
 				}
 			}
