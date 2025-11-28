@@ -167,7 +167,7 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 				"PokeProtocol: Connection rejected by Host Peer '"+host.Name+"'",
 				nil,
 			)
-			fmt.Println("\n❌ Host declined your connection request.")
+			fmt.Println("\nHost declined your connection request.")
 			return -1 // Return -1 to signal rejection
 		}
 	}

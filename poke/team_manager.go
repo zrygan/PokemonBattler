@@ -27,7 +27,7 @@ func (tm *TeamManager) CustomizePokemon(pokemon *Pokemon) (*PokemonProfile, erro
 	// Try to load existing profile
 	profile, err := LoadProfile(tm.TrainerName, pokemon.Name)
 	if err == nil {
-		fmt.Printf("\n🎉 Welcome back! Found existing profile for %s!\n", pokemon.Name)
+		fmt.Printf("\nWelcome back! Found existing profile for %s!\n", pokemon.Name)
 		profile.DisplayProfile()
 
 		fmt.Print("\nWould you like to use this profile? (y/n): ")
@@ -42,7 +42,7 @@ func (tm *TeamManager) CustomizePokemon(pokemon *Pokemon) (*PokemonProfile, erro
 	// Create new profile
 	profile = NewPokemonProfile(pokemon.Name)
 
-	fmt.Printf("\n✨ Let's customize your %s! ✨\n", pokemon.Name)
+	fmt.Printf("\nLet's customize your %s!\n", pokemon.Name)
 
 	// Set nickname
 	fmt.Print("\nGive your Pokemon a nickname (or press Enter to skip): ")
@@ -54,7 +54,7 @@ func (tm *TeamManager) CustomizePokemon(pokemon *Pokemon) (*PokemonProfile, erro
 	}
 
 	// Choose personality
-	fmt.Println("\n🎭 Choose a personality for your Pokemon:")
+	fmt.Println("\nChoose a personality for your Pokemon:")
 	for i, personality := range AllPersonalities {
 		fmt.Printf("%d. %s\n", i+1, personality)
 	}
@@ -80,7 +80,7 @@ func (tm *TeamManager) CustomizePokemon(pokemon *Pokemon) (*PokemonProfile, erro
 	if err := profile.SaveProfile(tm.TrainerName); err != nil {
 		fmt.Printf("Warning: Could not save profile: %v\n", err)
 	} else {
-		fmt.Println("\n✓ Profile saved successfully!")
+		fmt.Println("\nProfile saved successfully!")
 	}
 
 	return profile, nil
@@ -91,11 +91,11 @@ func (tm *TeamManager) UpdateProfileAfterBattle(profile *PokemonProfile, won boo
 	if won {
 		profile.RecordVictory()
 		fmt.Printf("\n%s\n", profile.GetFlavorText("victory"))
-		fmt.Printf("🎊 %s gained friendship! (+5)\n", profile.GetDisplayName())
+		fmt.Printf("%s gained friendship! (+5)\n", profile.GetDisplayName())
 	} else {
 		profile.RecordDefeat()
 		fmt.Printf("\n%s tried their best...\n", profile.GetDisplayName())
-		fmt.Printf("💙 %s gained friendship! (+2)\n", profile.GetDisplayName())
+		fmt.Printf("%s gained friendship! (+2)\n", profile.GetDisplayName())
 	}
 
 	// Show updated stats
@@ -136,7 +136,7 @@ func (tm *TeamManager) ListProfiles() error {
 		return nil
 	}
 
-	fmt.Printf("\n📚 Your Pokemon Profiles:\n")
+	fmt.Printf("\nYour Pokemon Profiles:\n")
 	fmt.Println("=========================")
 
 	for _, filename := range trainerProfiles {
@@ -167,7 +167,7 @@ func ShowLowHealthMessage(profile *PokemonProfile) {
 	if profile == nil {
 		return
 	}
-	fmt.Printf("\n⚠️  %s\n", profile.GetFlavorText("low_hp"))
+	fmt.Printf("\nWARNING: %s\n", profile.GetFlavorText("low_hp"))
 }
 
 // ShowCriticalHitMessage displays a personality-based critical hit message
@@ -175,5 +175,5 @@ func ShowCriticalHitMessage(profile *PokemonProfile) {
 	if profile == nil {
 		return
 	}
-	fmt.Printf("\n💥 %s\n", profile.GetFlavorText("critical_hit"))
+	fmt.Printf("\nCRITICAL HIT: %s\n", profile.GetFlavorText("critical_hit"))
 }

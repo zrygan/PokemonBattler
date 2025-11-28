@@ -318,7 +318,7 @@ func RunBattle(
 		// Check if self fainted
 		if IsFainted(&selfPlayer.PokemonStruct) {
 			game.State = StateGameOver
-			fmt.Println("\n💀 Your Pokemon fainted! You lose!")
+			fmt.Println("\nYour Pokemon fainted! You lose!")
 			winner = opponentPlayer.Peer.Name
 			loser = selfPlayer.Peer.Name
 
@@ -345,7 +345,7 @@ func RunBattle(
 		// Check if opponent fainted (update opponent HP tracking)
 		if IsFainted(&opponentPlayer.PokemonStruct) {
 			game.State = StateGameOver
-			fmt.Println("\n🎉 Opponent's Pokemon fainted! You win!")
+			fmt.Println("\nOpponent's Pokemon fainted! You win!")
 			winner = selfPlayer.Peer.Name
 			loser = opponentPlayer.Peer.Name
 
@@ -375,7 +375,7 @@ func RunBattle(
 exitBattle:
 	// Display Battle Log
 	fmt.Println("\n=== BATTLE END ===")
-	fmt.Println("\n📜 BATTLE LOG:")
+	fmt.Println("\nBATTLE LOG:")
 	for i, entry := range game.BattleLog {
 		fmt.Printf("%d. %s\n", i+1, entry)
 	}

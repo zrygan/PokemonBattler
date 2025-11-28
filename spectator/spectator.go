@@ -22,12 +22,11 @@ func main() {
 	// Set global verbose mode
 	netio.Verbose = *verboseFlag
 
-	fmt.Println("Welcome to PokeBattler - Spectator Mode")
-	fmt.Println("(c) Zhean Ganituen /zrygan/, 2025")
-	fmt.Println()
-
-	// Create peer descriptor
+	// Create peer descriptor (Login() will print welcome message)
 	self := peer.MakePDFromLogin("spectatorW")
+
+	fmt.Println("Spectator Mode Activated")
+	fmt.Println()
 	defer self.Conn.Close()
 
 	// Discover hosts
