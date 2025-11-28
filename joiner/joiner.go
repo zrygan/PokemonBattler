@@ -25,17 +25,17 @@ func lookForMatch() map[string]string {
 	}
 	defer conn.Close()
 
-	// broadcast
-	bAddr := net.UDPAddr{
-		IP:   net.IPv4bcast, // 255.255.255.255
-		Port: 50000,         // discovery port
-	}
-
-	// send the broadcast message
+	// Broadcast to multiple ports to discover hosts (50000-50010)
+	// This allows discovery of hosts that auto-incremented to different ports
 	msg := messages.MakeJoiningMMB()
-	_, err = conn.WriteToUDP(msg.SerializeMessage(), &bAddr)
-	if err != nil {
-		panic(err)
+	msgBytes := msg.SerializeMessage()
+	
+	for port := 50000; port <= 50010; port++ {
+		bAddr := net.UDPAddr{
+			IP:   net.IPv4bcast, // 255.255.255.255
+			Port: port,
+		}
+		conn.WriteToUDP(msgBytes, &bAddr)
 	}
 
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))

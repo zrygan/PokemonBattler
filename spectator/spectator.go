@@ -45,18 +45,22 @@ func main() {
 }
 
 func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
-	broadcastAddr := &net.UDPAddr{
-		IP:   net.IPv4bcast,
-		Port: 50000,
-	}
-
 	fmt.Println("🔍 Searching for active battles...")
 	fmt.Println("Listening for 5 seconds...")
 	fmt.Println()
 
-	// Send discovery message
+	// Broadcast to multiple ports to discover hosts (50000-50010)
+	// This allows discovery of hosts that auto-incremented to different ports
 	discoveryMsg := messages.MakeJoiningMMB()
-	self.Conn.WriteToUDP(discoveryMsg.SerializeMessage(), broadcastAddr)
+	msgBytes := discoveryMsg.SerializeMessage()
+	
+	for port := 50000; port <= 50010; port++ {
+		broadcastAddr := &net.UDPAddr{
+			IP:   net.IPv4bcast,
+			Port: port,
+		}
+		self.Conn.WriteToUDP(msgBytes, broadcastAddr)
+	}
 
 	// Listen for responses
 	self.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
