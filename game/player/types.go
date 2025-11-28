@@ -12,4 +12,5 @@ type Player struct {
 	SpecialAttackUsesLeft  int                  // Special attack boosts remaining
 	SpecialDefenseUsesLeft int                  // Special defense boosts remaining
 	Profile                *poke.PokemonProfile // Pokemon personality and nickname
+	TrainerName            string               // Trainer name for profile management
 }

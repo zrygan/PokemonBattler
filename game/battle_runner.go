@@ -393,9 +393,8 @@ exitBattle:
 	if selfPlayer.Profile != nil {
 		won := winner == selfPlayer.Peer.Name
 
-		// Get trainer name from profile or peer
-		trainerName := selfPlayer.Peer.Name
-		teamManager := poke.NewTeamManager(trainerName)
+		// Use the original trainer name to ensure profile continuity
+		teamManager := poke.NewTeamManager(selfPlayer.TrainerName)
 
 		// Update profile with battle results
 		err := teamManager.UpdateProfileAfterBattle(selfPlayer.Profile, won)

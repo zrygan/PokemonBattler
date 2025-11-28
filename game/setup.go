@@ -121,6 +121,7 @@ func PlayerSetUp(self peer.PeerDescriptor) player.Player {
 		SpecialAttackUsesLeft:  spatk,
 		SpecialDefenseUsesLeft: spdef,
 		Profile:                profile,
+		TrainerName:            trainerName,
 	}
 }
 
