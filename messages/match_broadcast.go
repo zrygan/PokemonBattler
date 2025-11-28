@@ -18,7 +18,7 @@ func MakeJoiningMMB() Message {
 func MakeHostingMMB(pd peer.PeerDescriptor) Message {
 	params := map[string]any{
 		"name": pd.Name,
-		"ip":   pd.Addr.IP,
+		"ip":   pd.Addr.IP.String(), // Convert IP to string for proper serialization
 		"port": pd.Addr.Port,
 	}
 

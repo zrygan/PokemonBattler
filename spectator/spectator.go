@@ -55,12 +55,21 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	discoveryMsg := messages.MakeJoiningMMB()
 	msgBytes := discoveryMsg.SerializeMessage()
 
-	for port := 50000; port <= 50010; port++ {
-		broadcastAddr := &net.UDPAddr{
-			IP:   net.IPv4bcast,
-			Port: port,
+	// Try both broadcast and localhost discovery for better reliability
+	addresses := []string{
+		"255.255.255.255", // Network broadcast
+		"127.0.0.1",       // Localhost
+		"192.168.68.106",  // Current network IP
+	}
+
+	for _, addr := range addresses {
+		for port := 50000; port <= 50010; port++ {
+			broadcastAddr := &net.UDPAddr{
+				IP:   net.ParseIP(addr),
+				Port: port,
+			}
+			self.Conn.WriteToUDP(msgBytes, broadcastAddr)
 		}
-		self.Conn.WriteToUDP(msgBytes, broadcastAddr)
 	}
 
 	// Listen for responses
