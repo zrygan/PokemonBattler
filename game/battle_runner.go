@@ -468,16 +468,16 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 
 	msgBytes := msg.SerializeMessage()
 
-	// Send to opponent
-	selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
-
 	// Send chat message according to communication mode
 	switch game.CommunicationMode {
-	case "P": // P2P mode - explicitly broadcast to spectators
+	case "P": // P2P mode - direct to opponent, explicit spectator broadcast
+		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
 		game.BroadcastToSpectators(msgBytes)
-	case "B": // Broadcast mode - spectators receive as part of network broadcast
+	case "B": // Broadcast mode - send to opponent AND spectators simultaneously
+		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
 		game.BroadcastToSpectators(msgBytes)
-	default: // Default to broadcasting
+	default: // Default to P2P behavior
+		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
 		game.BroadcastToSpectators(msgBytes)
 	}
 

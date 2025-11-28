@@ -211,18 +211,25 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 				}
 			}
 
-			// Host relays all chat messages
+			// Host relays chat messages according to communication mode
 			if bc.IsHost {
 				// Check if message is from joiner (not from us or spectators)
 				isFromOpponent := addr.IP.Equal(bc.OpponentAddr.IP) && addr.Port == bc.OpponentAddr.Port
 
 				if isFromOpponent {
-					// Message from joiner - relay to spectators only
+					// Message from joiner - always relay to spectators
 					bc.broadcastToSpectators(buf[:n])
 				} else {
-					// Message from spectator - relay to joiner AND other spectators
-					bc.SelfPlayer.Peer.Conn.WriteToUDP(buf[:n], bc.OpponentAddr)
-					bc.broadcastToSpectators(buf[:n])
+					// Message from spectator - relay according to communication mode
+					switch bc.Game.CommunicationMode {
+					case "P": // P2P mode - spectator messages stay with spectators only
+						bc.broadcastToSpectators(buf[:n])
+					case "B": // Broadcast mode - relay to joiner AND other spectators  
+						bc.SelfPlayer.Peer.Conn.WriteToUDP(buf[:n], bc.OpponentAddr)
+						bc.broadcastToSpectators(buf[:n])
+					default: // Default to P2P behavior
+						bc.broadcastToSpectators(buf[:n])
+					}
 				}
 			}
 
