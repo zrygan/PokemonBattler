@@ -57,7 +57,7 @@ func MakePDBase(name, ip, port string, isLocal bool) PeerDescriptor {
 				// Successfully bound to port
 				// Update addr to reflect the actual bound address
 				addr = conn.LocalAddr().(*net.UDPAddr)
-				
+
 				if port != originalPort {
 					netio.VerboseEventLog(
 						"Port "+originalPort+" was in use, automatically using port "+strconv.Itoa(addr.Port)+" instead.",
