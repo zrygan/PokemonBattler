@@ -178,6 +178,10 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 			} else if contentType == "STICKER" {
 				fmt.Printf("\n🎨 [%s]: <sent a sticker>\n", senderName)
 			}
+
+			// Relay chat message to spectators (host only)
+			bc.broadcastToSpectators(buf[:n])
+
 			continue // Keep waiting for the actual battle message
 		}
 
