@@ -3,7 +3,6 @@ package game
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -70,10 +69,6 @@ func RunBattle(
 	fmt.Printf("Special Defense Boosts: %d\n", selfPlayer.SpecialDefenseUsesLeft)
 	fmt.Println("\n💬 Tip: Type 'chat <message>' at any prompt to send a chat message!")
 	fmt.Println()
-
-	// Start chat listener in background
-	chatChannel := make(chan string, 10)
-	go listenForChatMessages(selfPlayer, opponentPlayer, game, chatChannel)
 
 	// Battle loop
 	turnNumber := 1
@@ -262,35 +257,6 @@ func ListenForMessages(
 			// Handle ACK
 			if ackNum, ok := (*msg.MessageParams)["ack_number"].(int); ok {
 				reliableConn.ReceiveAck(ackNum)
-			}
-		}
-	}
-}
-
-// listenForChatMessages listens for incoming chat messages in the background
-func listenForChatMessages(selfPlayer *player.Player, opponentPlayer *player.Player, game *Game, chatChannel chan string) {
-	buf := make([]byte, 65535)
-	for {
-		// Set a short read timeout so we don't block forever
-		selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-		n, _, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
-		selfPlayer.Peer.Conn.SetReadDeadline(time.Time{}) // Clear deadline
-
-		if err != nil {
-			continue
-		}
-
-		msg := messages.DeserializeMessage(buf[:n])
-		if msg.MessageType == messages.ChatMessage {
-			params := *msg.MessageParams
-			senderName := params["sender_name"].(string)
-			contentType := params["content_type"].(string)
-
-			if contentType == "TEXT" {
-				messageText := params["message_text"].(string)
-				fmt.Printf("\n💬 [%s]: %s\n", senderName, messageText)
-			} else if contentType == "STICKER" {
-				fmt.Printf("\n🎨 [%s]: <sent a sticker>\n", senderName)
 			}
 		}
 	}

@@ -165,6 +165,22 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 
 		msg := messages.DeserializeMessage(buf[:n])
 
+		// Ignore chat messages - they're handled by background listener
+		if msg.MessageType == messages.ChatMessage {
+			// Display the chat message inline
+			params := *msg.MessageParams
+			senderName := params["sender_name"].(string)
+			contentType := params["content_type"].(string)
+
+			if contentType == "TEXT" {
+				messageText := params["message_text"].(string)
+				fmt.Printf("\n💬 [%s]: %s\n", senderName, messageText)
+			} else if contentType == "STICKER" {
+				fmt.Printf("\n🎨 [%s]: <sent a sticker>\n", senderName)
+			}
+			continue // Keep waiting for the actual battle message
+		}
+
 		// Check for GAME_OVER message - opponent's pokemon fainted
 		if msg.MessageType == messages.GameOver {
 			bc.Game.State = StateGameOver
