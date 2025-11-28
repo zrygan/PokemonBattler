@@ -47,8 +47,12 @@ func (g *Game) AddSpectator(spectator peer.PeerDescriptor) {
 
 // BroadcastToSpectators sends a message to all spectators.
 func (g *Game) BroadcastToSpectators(messageData []byte) {
+	if g.Host == nil || g.Host.Peer.Conn == nil {
+		return // No host connection available
+	}
+
 	for _, spectator := range g.Spectators {
-		spectator.Conn.WriteToUDP(messageData, spectator.Addr)
+		g.Host.Peer.Conn.WriteToUDP(messageData, spectator.Addr)
 	}
 }
 

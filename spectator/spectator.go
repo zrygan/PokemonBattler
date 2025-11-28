@@ -55,30 +55,22 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	discoveryMsg := messages.MakeJoiningMMB()
 	msgBytes := discoveryMsg.SerializeMessage()
 
-	// Try both broadcast and localhost discovery for better reliability
-	addresses := []string{
-		"255.255.255.255", // Network broadcast
-		"127.0.0.1",       // Localhost
-		"192.168.68.106",  // Current network IP
-	}
-
-	for _, addr := range addresses {
-		for port := 50000; port <= 50010; port++ {
-			broadcastAddr := &net.UDPAddr{
-				IP:   net.ParseIP(addr),
-				Port: port,
-			}
-			self.Conn.WriteToUDP(msgBytes, broadcastAddr)
+	for port := 50000; port <= 50010; port++ {
+		broadcastAddr := &net.UDPAddr{
+			IP:   net.IPv4bcast, // 255.255.255.255
+			Port: port,
 		}
+		self.Conn.WriteToUDP(msgBytes, broadcastAddr)
 	}
 
 	// Listen for responses
 	self.Conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	defer self.Conn.SetReadDeadline(time.Time{})
 
-	buf := make([]byte, 1024)
-	discoveredHosts := make(map[string]peer.PeerDescriptor)
+	// make a map of discovered hosts (same format as joiner)
+	discoveredHosts := make(map[string]string)
 
+	buf := make([]byte, 1024)
 	for {
 		n, _, err := self.Conn.ReadFromUDP(buf)
 		if err != nil {
@@ -87,46 +79,41 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 
 		msg := messages.DeserializeMessage(buf[:n])
 		if msg.MessageType == messages.MMB_HOSTING {
-			hostName := (*msg.MessageParams)["name"].(string)
+			hostName := fmt.Sprint((*msg.MessageParams)["name"])
+			hostPort := fmt.Sprint((*msg.MessageParams)["port"])
 			hostIP := fmt.Sprint((*msg.MessageParams)["ip"])
-			hostPort := (*msg.MessageParams)["port"].(int)
-
-			// Create proper address from message params
-			hostAddr := &net.UDPAddr{
-				IP:   net.ParseIP(hostIP),
-				Port: hostPort,
-			}
-
-			host := peer.PeerDescriptor{
-				Name: hostName,
-				Addr: hostAddr,
-			}
-			discoveredHosts[hostName] = host
 
 			netio.VerboseEventLog(
 				"PokeProtocol: Spectator Peer discovered available Host Peer '"+hostName+"'",
 				&netio.LogOptions{
 					Name: hostName,
-					Port: fmt.Sprint(hostPort),
+					Port: hostPort,
 					IP:   hostIP,
 				},
 			)
+
+			hostDets := fmt.Sprintf("%s %s", hostIP, hostPort)
+			discoveredHosts[hostName] = hostDets
 		}
 	}
 
 	fmt.Println("Discovered Hosts")
-	for name, host := range discoveredHosts {
-		fmt.Printf("\t%s @ %s:%d\n", name, host.Addr.IP, host.Addr.Port)
+	for name, details := range discoveredHosts {
+		fmt.Printf("\t%s @ %s\n", name, details)
 	}
 	fmt.Println()
 
 	if len(discoveredHosts) == 0 {
+		fmt.Println("No hosts found!")
+		fmt.Println("Make sure a host is running and in 'waiting for match' state.")
 		return nil
 	}
 
-	// Select host by name
-	for {
-		hostName := netio.PRLine("Select a host to spectate... (or type /R to search again)")
+	// Select host by name (same logic as joiner)
+	var hostDets []string = nil
+	hostName := ""
+	for hostDets == nil {
+		hostName = netio.PRLine("Select a host to spectate... (or type /R to search again)")
 
 		// Check for restart command (case-insensitive)
 		if strings.ToUpper(hostName) == "/R" {
@@ -134,24 +121,26 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 		}
 
 		// Try exact match first, then case-insensitive
-		host, ok := discoveredHosts[hostName]
+		hostVal, ok := discoveredHosts[hostName]
 		if !ok {
 			// Try case-insensitive search
 			for key, val := range discoveredHosts {
 				if strings.EqualFold(key, hostName) {
-					host = val
+					hostVal = val
 					ok = true
 					break
 				}
 			}
 		}
-
 		if ok {
-			return &host
+			hostDets = strings.Split(hostVal, " ")
+		} else {
+			fmt.Println("Host name not found. Try again.")
 		}
-
-		fmt.Println("Host name not found. Try again.")
 	}
+
+	pd := peer.MakeRemotePD(hostName, hostDets[0], hostDets[1])
+	return &pd
 }
 
 // sendSpectatorChat sends a chat message or sticker from spectator to host
