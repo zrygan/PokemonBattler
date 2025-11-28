@@ -55,11 +55,14 @@ func MakePDBase(name, ip, port string, isLocal bool) PeerDescriptor {
 			conn, err = net.ListenUDP("udp", addr)
 			if err == nil {
 				// Successfully bound to port
+				// Update addr to reflect the actual bound address
+				addr = conn.LocalAddr().(*net.UDPAddr)
+				
 				if port != originalPort {
 					netio.VerboseEventLog(
-						"Port "+originalPort+" was in use, automatically using port "+port+" instead.",
+						"Port "+originalPort+" was in use, automatically using port "+strconv.Itoa(addr.Port)+" instead.",
 						&netio.LogOptions{
-							Port: port,
+							Port: strconv.Itoa(addr.Port),
 							IP:   ip,
 						},
 					)
@@ -80,6 +83,8 @@ func MakePDBase(name, ip, port string, isLocal bool) PeerDescriptor {
 				if err != nil {
 					panic(err)
 				}
+				// Update addr to reflect the actual bound address
+				addr = conn.LocalAddr().(*net.UDPAddr)
 				break
 			}
 			port = strconv.Itoa(portNum + 1)
