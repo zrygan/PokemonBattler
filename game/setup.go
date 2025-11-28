@@ -135,11 +135,27 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, sp
 	)
 
 	msgBytes := msg.SerializeMessage()
-	self.Peer.Conn.WriteToUDP(msgBytes, other.Addr)
 
-	// Broadcast to spectators
-	for _, spec := range spectators {
-		self.Peer.Conn.WriteToUDP(msgBytes, spec.Addr)
+	// Send battle setup according to communication mode
+	switch cmode {
+	case "P": // P2P mode - direct send only
+		self.Peer.Conn.WriteToUDP(msgBytes, other.Addr)
+		// In P2P mode, explicitly broadcast to spectators
+		for _, spectator := range spectators {
+			self.Peer.Conn.WriteToUDP(msgBytes, spectator.Addr)
+		}
+	case "B": // Broadcast mode - send to target and broadcast to network
+		self.Peer.Conn.WriteToUDP(msgBytes, other.Addr)
+		// In broadcast mode, send to all spectators as part of network broadcast
+		for _, spectator := range spectators {
+			self.Peer.Conn.WriteToUDP(msgBytes, spectator.Addr)
+		}
+		// Note: In a full implementation, this would use actual network broadcast
+	default: // Default to P2P behavior
+		self.Peer.Conn.WriteToUDP(msgBytes, other.Addr)
+		for _, spectator := range spectators {
+			self.Peer.Conn.WriteToUDP(msgBytes, spectator.Addr)
+		}
 	}
 
 	netio.VerboseEventLog(

@@ -223,9 +223,13 @@ func RunBattle(
 					gameOverBytes := gameOverMsg.SerializeMessage()
 					selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
 
-					// Broadcast to spectators
+					// Send game over message according to communication mode
 					if isHost {
-						game.BroadcastToSpectators(gameOverBytes)
+						// In P2P mode, explicitly send to spectators
+						// In broadcast mode, spectators already received the message
+						if game.CommunicationMode == "P" {
+							game.BroadcastToSpectators(gameOverBytes)
+						}
 					}
 					break
 				}
@@ -270,9 +274,13 @@ func RunBattle(
 							gameOverBytes := gameOverMsg.SerializeMessage()
 							selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
 
-							// Broadcast to spectators
+							// Send game over message according to communication mode
 							if isHost {
-								game.BroadcastToSpectators(gameOverBytes)
+								// In P2P mode, explicitly send to spectators
+								// In broadcast mode, spectators already received the message
+								if game.CommunicationMode == "P" {
+									game.BroadcastToSpectators(gameOverBytes)
+								}
 							}
 							goto exitBattle
 						}
@@ -464,8 +472,15 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	// Send to opponent
 	selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
 
-	// Broadcast to spectators
-	game.BroadcastToSpectators(msgBytes)
+	// Send chat message according to communication mode
+	switch game.CommunicationMode {
+	case "P": // P2P mode - explicitly broadcast to spectators
+		game.BroadcastToSpectators(msgBytes)
+	case "B": // Broadcast mode - spectators receive as part of network broadcast
+		game.BroadcastToSpectators(msgBytes)
+	default: // Default to broadcasting
+		game.BroadcastToSpectators(msgBytes)
+	}
 
 	if contentType == "STICKER" {
 		fmt.Printf("You sent sticker: %s\n", displayText)

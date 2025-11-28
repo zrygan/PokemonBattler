@@ -23,8 +23,21 @@ type BattleContext struct {
 
 // broadcastToSpectators sends a message to all spectators
 func (bc *BattleContext) broadcastToSpectators(msg []byte) {
-	if bc.IsHost && len(bc.Game.Spectators) > 0 {
+	if len(bc.Game.Spectators) > 0 {
 		bc.Game.BroadcastToSpectators(msg)
+	}
+}
+
+// sendMessage sends a message according to the communication mode
+func (bc *BattleContext) sendMessage(msg []byte, target peer.PeerDescriptor) {
+	switch bc.Game.CommunicationMode {
+	case "P": // P2P mode - direct send only
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
+	case "B": // Broadcast mode - send to target and broadcast to spectators
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
+		bc.broadcastToSpectators(msg)
+	default: // Default to P2P behavior
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
 	}
 }
 

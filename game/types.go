@@ -48,6 +48,21 @@ func (g *Game) AddSpectator(spectator peer.PeerDescriptor) {
 // BroadcastToSpectators sends a message to all spectators.
 func (g *Game) BroadcastToSpectators(messageData []byte) {
 	for _, spectator := range g.Spectators {
-		g.Host.Peer.Conn.WriteToUDP(messageData, spectator.Addr)
+		spectator.Conn.WriteToUDP(messageData, spectator.Addr)
+	}
+}
+
+// SendMessage sends a message according to the communication mode.
+// In P2P mode, only sends directly to target.
+// In Broadcast mode, sends to target and all spectators.
+func (g *Game) SendMessage(messageData []byte, sender peer.PeerDescriptor, target peer.PeerDescriptor) {
+	switch g.CommunicationMode {
+	case "P": // P2P mode - direct send only
+		sender.Conn.WriteToUDP(messageData, target.Addr)
+	case "B": // Broadcast mode - send to target and broadcast to spectators
+		sender.Conn.WriteToUDP(messageData, target.Addr)
+		g.BroadcastToSpectators(messageData)
+	default: // Default to P2P behavior
+		sender.Conn.WriteToUDP(messageData, target.Addr)
 	}
 }
