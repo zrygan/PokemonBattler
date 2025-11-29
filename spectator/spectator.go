@@ -53,9 +53,13 @@ func main() {
 		// Send spectator request
 		fmt.Printf("\nLOG :: Requesting to spectate %s's battle\n", host.Name)
 		spectatorReq := messages.MakeSpectatorRequest()
-		self.Conn.WriteToUDP(spectatorReq.SerializeMessage(), host.Addr)
+		reqBytes := spectatorReq.SerializeMessage()
 
-		// Verbose logging for SPECTATOR_REQUEST
+		// Send spectator request multiple times to ensure delivery
+		for i := 0; i < 3; i++ {
+			self.Conn.WriteToUDP(reqBytes, host.Addr)
+			time.Sleep(100 * time.Millisecond) // Small delay between attempts
+		} // Verbose logging for SPECTATOR_REQUEST
 		netio.VerboseEventLog(
 			"PokeProtocol: Sent SPECTATOR_REQUEST to host",
 			&netio.LogOptions{
@@ -71,13 +75,16 @@ func main() {
 		// Battle ended, return to main menu
 		fmt.Println("\n=== RETURNING TO MAIN MENU ===")
 		fmt.Println("Looking for another battle...")
+
+		// Wait a moment for hosts to finish their cleanup and be ready for new battles
+		time.Sleep(3 * time.Second)
 		fmt.Println()
 	}
 }
 
 func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	fmt.Println("Searching for active battles...")
-	fmt.Println("Listening for 3 seconds...")
+	fmt.Println("Listening for 5 seconds...")
 	fmt.Println()
 
 	// Broadcast to multiple ports to discover hosts (50000-50010)
@@ -94,7 +101,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	}
 
 	// Listen for responses
-	self.Conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	self.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	defer self.Conn.SetReadDeadline(time.Time{})
 
 	// make a map of discovered hosts (same format as joiner)

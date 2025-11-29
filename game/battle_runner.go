@@ -416,15 +416,16 @@ func RunBattle(
 	}
 
 exitBattle:
+	// Clear spectators list to prevent stale connections
+	game.Spectators = make([]peer.PeerDescriptor, 0)
+
 	// Display Battle Log
 	fmt.Println("\n=== BATTLE END ===")
 	fmt.Println("\nBATTLE LOG:")
 	for i, entry := range game.BattleLog {
 		fmt.Printf("%d. %s\n", i+1, entry)
 	}
-	fmt.Println()
-
-	// Update Pokemon profiles after battle
+	fmt.Println() // Update Pokemon profiles after battle
 	if selfPlayer.Profile != nil {
 		won := winner == selfPlayer.Peer.Name
 

@@ -145,8 +145,16 @@ func main() {
 		// Start the battle with spectators
 		game.RunBattle(&p, &opponentPlayer, seed, cmode, true, spectators)
 
-		// Battle ended, return to main menu
+		// Battle ended, clear spectators and return to main menu
 		fmt.Println("\n=== BATTLE COMPLETED ===")
+
+		// Notify spectators that battle has ended and they should look for new battles
+		if len(spectators) > 0 {
+			fmt.Printf("Disconnecting %d spectator(s)...\n", len(spectators))
+			// Give spectators time to process GAME_OVER message
+			time.Sleep(1 * time.Second)
+		}
+
 		fmt.Println("Returning to host menu...")
 		time.Sleep(2 * time.Second)
 	}
