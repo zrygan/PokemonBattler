@@ -490,12 +490,16 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 		base64Data, err := LoadEsticker(filePath)
 		if err != nil {
 			fmt.Printf("Error loading esticker: %v\n", err)
-			return
+			// Send a fallback text message so others know someone tried to send an esticker
+			messageText = fmt.Sprintf("Failed to send esticker: %s", filepath.Base(filePath))
+			contentType = "TEXT"
+			displayText = messageText
+		} else {
+			contentType = "STICKER"
+			stickerData = base64Data
+			displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
+			messageText = "" // Clear message text for stickers
 		}
-		contentType = "STICKER"
-		stickerData = base64Data
-		displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
-		messageText = "" // Clear message text for stickers
 	} else if strings.HasPrefix(messageText, "/") {
 		// Check for regular ASCII art stickers
 		if stickerText, exists := Stickers[strings.ToLower(messageText)]; exists {
@@ -546,6 +550,15 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 
 // processIncomingChat handles and displays incoming chat messages
 func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleContext, msgBytes []byte, senderAddr *net.UDPAddr) {
+	// Verbose logging for received CHAT_MESSAGE
+	netio.VerboseEventLog(
+		"PokeProtocol: Received CHAT_MESSAGE during battle",
+		&netio.LogOptions{
+			MessageParams: msg.MessageParams,
+			MS:            senderAddr.String(),
+		},
+	)
+
 	params := *msg.MessageParams
 	senderName, _ := params["sender_name"].(string)
 	contentType, _ := params["content_type"].(string)

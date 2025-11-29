@@ -58,11 +58,9 @@ func lookForMatch() map[string]string {
 			hostIP := fmt.Sprint((*msg.MessageParams)["ip"])
 
 			netio.VerboseEventLog(
-				"PokeProtocol: Joiner Peer discovered available Host Peer '"+hostName+"'",
+				"PokeProtocol: Joiner Peer received MMB_HOSTING response from Host Peer '"+hostName+"'",
 				&netio.LogOptions{
-					Name: hostName,
-					Port: hostPort,
-					IP:   hostIP,
+					MessageParams: msg.MessageParams,
 				},
 			)
 
@@ -164,8 +162,10 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 			return val
 		} else if msg.MessageType == messages.HandshakeRejected {
 			netio.VerboseEventLog(
-				"PokeProtocol: Connection rejected by Host Peer '"+host.Name+"'",
-				nil,
+				"PokeProtocol: Joiner Peer received HANDSHAKE_REJECTED from Host Peer '"+host.Name+"'",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
 			)
 			fmt.Println("\nHost declined your connection request.")
 			return -1 // Return -1 to signal rejection

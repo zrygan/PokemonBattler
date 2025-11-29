@@ -23,6 +23,14 @@ func Host_setCMode(host peer.PeerDescriptor, join peer.PeerDescriptor) string {
 		case Broadcast:
 			msg := messages.GS_MakeCMode(mode)
 			host.Conn.WriteToUDP(msg.SerializeMessage(), join.Addr)
+
+			netio.VerboseEventLog(
+				"PokeProtocol: Host Peer sent COMM_MODE message to Joiner Peer '"+join.Name+"'",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			return mode
 		default:
 			netio.ERLine("Invalid input. Please enter P or B.", false)
@@ -41,6 +49,13 @@ func Joiner_getCMode(p peer.PeerDescriptor) string {
 		msg := messages.DeserializeMessage(buf[:n])
 
 		if msg.MessageType == messages.GS_COMMMODE {
+			netio.VerboseEventLog(
+				"PokeProtocol: Joiner Peer received COMM_MODE message from Host Peer",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			return (*msg.MessageParams)["cmode"].(string)
 		}
 	}

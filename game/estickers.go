@@ -61,7 +61,7 @@ func LoadEsticker(filePath string) (string, error) {
 	height := bounds.Dy()
 
 	if width != RequiredWidth || height != RequiredHeight {
-		return "", fmt.Errorf("invalid sticker dimensions: %dx%d (required: %dx%d)", width, height, RequiredWidth, RequiredHeight)
+		return "", fmt.Errorf("invalid sticker dimensions: %dx%d (required: exactly %dx%d pixels)\nTip: Resize your image to exactly 320x320 pixels before sending as an esticker", width, height, RequiredWidth, RequiredHeight)
 	}
 
 	// Encode to Base64
@@ -98,7 +98,7 @@ func SaveEsticker(base64Data string, senderName string) (string, error) {
 	height := bounds.Dy()
 
 	if width != RequiredWidth || height != RequiredHeight {
-		return "", fmt.Errorf("invalid sticker dimensions: %dx%d (required: %dx%d)", width, height, RequiredWidth, RequiredHeight)
+		return "", fmt.Errorf("received esticker has invalid dimensions: %dx%d (required: exactly %dx%d pixels)", width, height, RequiredWidth, RequiredHeight)
 	}
 
 	// Create save directory if it doesn't exist

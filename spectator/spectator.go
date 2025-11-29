@@ -200,12 +200,16 @@ func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messa
 		base64Data, err := game.LoadEsticker(filePath)
 		if err != nil {
 			fmt.Printf("Error loading esticker: %v\n", err)
-			return
+			// Send a fallback text message so others know someone tried to send an esticker
+			messageText = fmt.Sprintf("Failed to send esticker: %s", filepath.Base(filePath))
+			contentType = "TEXT"
+			displayText = messageText
+		} else {
+			contentType = "STICKER"
+			stickerData = base64Data
+			displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
+			messageText = "" // Clear message text for stickers
 		}
-		contentType = "STICKER"
-		stickerData = base64Data
-		displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
-		messageText = "" // Clear message text for stickers
 	} else if strings.HasPrefix(messageText, "/") {
 		// Check for regular ASCII art stickers
 		if stickerText, exists := game.Stickers[strings.ToLower(messageText)]; exists {
@@ -242,28 +246,8 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 	fmt.Println("Type 'chat <message>', stickers like '/gg', or 'esticker <filepath>' to send messages!")
 	fmt.Println()
 
-	// Start goroutine to handle chat input from spectator
-	go func() {
-		for {
-			input := netio.PRLine("")
-			if len(input) == 0 {
-				continue
-			}
-
-			// Check if it's a chat command
-			messageText := ""
-			if len(input) > 5 && input[:5] == "chat " {
-				messageText = input[5:]
-			} else if strings.HasPrefix(input, "/") {
-				messageText = input // Treat as sticker
-			} else {
-				messageText = input // Treat as regular message
-			}
-
-			// Send chat message to host
-			sendSpectatorChat(self, *host, messageText)
-		}
-	}()
+	// Start input listener for non-blocking input (like joiner)
+	inputChan := netio.StartInputListener()
 
 	buf := make([]byte, 65535)
 
@@ -272,147 +256,207 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 	var hostMaxHP, joinerMaxHP int
 	battleStarted := false
 
+	// Message deduplication to prevent duplicate logging in broadcast mode
+	processedMessages := make(map[string]bool)
+
 	for {
-		n, _, err := self.Conn.ReadFromUDP(buf)
-		if err != nil {
-			continue
-		}
+		select {
+		case input := <-inputChan:
+			// Handle user input
+			if len(input) == 0 {
+				continue
+			}
 
-		msg := messages.DeserializeMessage(buf[:n])
+			// Check if it's a chat command
+			messageText := ""
+			if len(input) > 5 && input[:5] == "chat " {
+				messageText = input[5:]
+			} else if strings.HasPrefix(input, "esticker ") {
+				messageText = input // Treat as esticker command
+			} else if strings.HasPrefix(input, "/") {
+				messageText = input // Treat as sticker
+			} else {
+				messageText = input // Treat as regular message
+			}
 
-		switch msg.MessageType {
-		case messages.BattleSetup:
-			// Verbose logging for received BATTLE_SETUP
-			netio.VerboseEventLog(
-				"PokeProtocol: Received BATTLE_SETUP from host",
-				&netio.LogOptions{
-					MessageParams: msg.MessageParams,
-				},
-			)
+			// Send chat message to host
+			sendSpectatorChat(self, *host, messageText)
 
-			params := *msg.MessageParams
-			pokemonName := params["pokemon_name"].(string)
+		default:
+			// Check for incoming network messages with short timeout
+			self.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+			n, _, err := self.Conn.ReadFromUDP(buf)
+			if err != nil {
+				self.Conn.SetReadDeadline(time.Time{}) // Clear deadline
+				time.Sleep(10 * time.Millisecond)      // Small delay to prevent busy waiting
+				continue
+			}
+			self.Conn.SetReadDeadline(time.Time{}) // Clear deadline
 
-			if !battleStarted {
-				if hostPokemon == "" {
-					hostPokemon = pokemonName
-					if mon, ok := monsters.MONSTERS[pokemonName]; ok {
-						hostHP = mon.HP
-						hostMaxHP = mon.HP
+			msg := messages.DeserializeMessage(buf[:n])
+
+			// Create unique message ID for deduplication
+			msgID := ""
+			if msg.MessageParams != nil {
+				params := *msg.MessageParams
+				if seqNum, ok := params["sequence_number"].(int); ok {
+					if sender, ok := params["sender_name"].(string); ok {
+						msgID = fmt.Sprintf("%s-%s-%d", msg.MessageType, sender, seqNum)
+					} else {
+						msgID = fmt.Sprintf("%s-%d", msg.MessageType, seqNum)
 					}
 				} else {
-					joinerPokemon = pokemonName
-					if mon, ok := monsters.MONSTERS[pokemonName]; ok {
-						joinerHP = mon.HP
-						joinerMaxHP = mon.HP
-					}
-					battleStarted = true
-					fmt.Printf("\nBATTLE: %s vs %s\n", hostPokemon, joinerPokemon)
-					fmt.Printf("   %s: %d/%d HP\n", hostPokemon, hostHP, hostMaxHP)
-					fmt.Printf("   %s: %d/%d HP\n\n", joinerPokemon, joinerHP, joinerMaxHP)
+					// For messages without sequence numbers, use message type and content
+					msgID = fmt.Sprintf("%s-%v", msg.MessageType, params)
 				}
-			}
-
-		case messages.AttackAnnounce:
-			// Verbose logging for received ATTACK_ANNOUNCE
-			netio.VerboseEventLog(
-				"PokeProtocol: Received ATTACK_ANNOUNCE",
-				&netio.LogOptions{
-					MessageParams: msg.MessageParams,
-				},
-			)
-
-			params := *msg.MessageParams
-			moveName := params["move_name"].(string)
-			fmt.Printf("Attack announced: %s\n", moveName)
-
-		case messages.CalculationReport:
-			// Verbose logging for received CALCULATION_REPORT
-			netio.VerboseEventLog(
-				"PokeProtocol: Received CALCULATION_REPORT",
-				&netio.LogOptions{
-					MessageParams: msg.MessageParams,
-				},
-			)
-
-			params := *msg.MessageParams
-			attacker := params["attacker"].(string)
-			moveName := params["move_used"].(string)
-			damage := params["damage_dealt"].(int)
-			defenderHP := params["defender_hp_remaining"].(int)
-			statusMsg := params["status_message"].(string)
-
-			fmt.Printf("\n%s used %s!\n", attacker, moveName)
-			fmt.Printf("   Damage: %d\n", damage)
-
-			// Update HP tracking
-			if attacker == hostPokemon {
-				joinerHP = defenderHP
 			} else {
-				hostHP = defenderHP
+				msgID = msg.MessageType
 			}
 
-			fmt.Printf("   Status: %s\n", statusMsg)
-			fmt.Printf("\n   Current HP:\n")
-			fmt.Printf("   %s: %d/%d\n", hostPokemon, hostHP, hostMaxHP)
-			fmt.Printf("   %s: %d/%d\n\n", joinerPokemon, joinerHP, joinerMaxHP)
+			// Skip if we've already processed this message
+			if processedMessages[msgID] {
+				continue
+			}
+			processedMessages[msgID] = true
 
-		case messages.GameOver:
-			// Verbose logging for received GAME_OVER
-			netio.VerboseEventLog(
-				"PokeProtocol: Received GAME_OVER",
-				&netio.LogOptions{
-					MessageParams: msg.MessageParams,
-				},
-			)
+			switch msg.MessageType {
+			case messages.BattleSetup:
+				// Verbose logging for received BATTLE_SETUP
+				netio.VerboseEventLog(
+					"PokeProtocol: Received BATTLE_SETUP from host",
+					&netio.LogOptions{
+						MessageParams: msg.MessageParams,
+					},
+				)
 
-			params := *msg.MessageParams
-			winner := params["winner"].(string)
-			loser := params["loser"].(string)
+				params := *msg.MessageParams
+				pokemonName := params["pokemon_name"].(string)
 
-			fmt.Printf("\n=== BATTLE END ===\n")
-			fmt.Printf("Winner: %s\n", winner)
-			fmt.Printf("Loser: %s\n", loser)
-			fmt.Println("\nBattle has ended. Returning to main menu...")
-
-			// Keep listening for any final messages
-			time.Sleep(3 * time.Second)
-			return
-
-		case messages.ChatMessage:
-			// Verbose logging for received CHAT_MESSAGE
-			netio.VerboseEventLog(
-				"PokeProtocol: Received CHAT_MESSAGE",
-				&netio.LogOptions{
-					MessageParams: msg.MessageParams,
-				},
-			)
-
-			params := *msg.MessageParams
-			sender, _ := params["sender_name"].(string)
-			contentType, _ := params["content_type"].(string)
-
-			if contentType == "TEXT" {
-				if text, ok := params["message_text"].(string); ok && text != "" {
-					fmt.Printf("[%s]: %s\n", sender, text)
-				}
-			} else if contentType == "STICKER" {
-				if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
-					// Check if it's an ASCII art sticker (starts with /)
-					if strings.HasPrefix(stickerData, "/") {
-						if stickerText, exists := game.Stickers[strings.ToLower(stickerData)]; exists {
-							fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
-						} else {
-							fmt.Printf("[%s] sent an unknown sticker\n", sender)
+				if !battleStarted {
+					if hostPokemon == "" {
+						hostPokemon = pokemonName
+						if mon, ok := monsters.MONSTERS[pokemonName]; ok {
+							hostHP = mon.HP
+							hostMaxHP = mon.HP
 						}
 					} else {
-						// Handle Base64 encoded sticker (esticker)
-						filename, err := game.SaveEsticker(stickerData, sender)
-						if err != nil {
-							fmt.Printf("[%s] sent an invalid esticker: %v\n", sender, err)
-						} else {
-							fmt.Printf("[%s] sent an esticker (saved as: %s)\n", sender, filename)
+						joinerPokemon = pokemonName
+						if mon, ok := monsters.MONSTERS[pokemonName]; ok {
+							joinerHP = mon.HP
+							joinerMaxHP = mon.HP
 						}
+						battleStarted = true
+						fmt.Printf("\nBATTLE: %s vs %s\n", hostPokemon, joinerPokemon)
+						fmt.Printf("   %s: %d/%d HP\n", hostPokemon, hostHP, hostMaxHP)
+						fmt.Printf("   %s: %d/%d HP\n\n", joinerPokemon, joinerHP, joinerMaxHP)
+					}
+				}
+
+			case messages.AttackAnnounce:
+				// Verbose logging for received ATTACK_ANNOUNCE
+				netio.VerboseEventLog(
+					"PokeProtocol: Received ATTACK_ANNOUNCE",
+					&netio.LogOptions{
+						MessageParams: msg.MessageParams,
+					},
+				)
+
+				params := *msg.MessageParams
+				moveName := params["move_name"].(string)
+				fmt.Printf("Attack announced: %s\n", moveName)
+
+			case messages.CalculationReport:
+				// Verbose logging for received CALCULATION_REPORT
+				netio.VerboseEventLog(
+					"PokeProtocol: Received CALCULATION_REPORT",
+					&netio.LogOptions{
+						MessageParams: msg.MessageParams,
+					},
+				)
+
+				params := *msg.MessageParams
+				attacker := params["attacker"].(string)
+				moveName := params["move_used"].(string)
+				damage := params["damage_dealt"].(int)
+				defenderHP := params["defender_hp_remaining"].(int)
+				statusMsg := params["status_message"].(string)
+
+				fmt.Printf("\n%s used %s!\n", attacker, moveName)
+				fmt.Printf("   Damage: %d\n", damage)
+
+				// Update HP tracking
+				if attacker == hostPokemon {
+					joinerHP = defenderHP
+				} else {
+					hostHP = defenderHP
+				}
+
+				fmt.Printf("   Status: %s\n", statusMsg)
+				fmt.Printf("\n   Current HP:\n")
+				fmt.Printf("   %s: %d/%d\n", hostPokemon, hostHP, hostMaxHP)
+				fmt.Printf("   %s: %d/%d\n\n", joinerPokemon, joinerHP, joinerMaxHP)
+
+			case messages.GameOver:
+				// Verbose logging for received GAME_OVER
+				netio.VerboseEventLog(
+					"PokeProtocol: Received GAME_OVER",
+					&netio.LogOptions{
+						MessageParams: msg.MessageParams,
+					},
+				)
+
+				params := *msg.MessageParams
+				winner := params["winner"].(string)
+				loser := params["loser"].(string)
+
+				fmt.Printf("\n=== BATTLE END ===\n")
+				fmt.Printf("Winner: %s\n", winner)
+				fmt.Printf("Loser: %s\n", loser)
+				fmt.Println("\nBattle has ended. Returning to main menu...")
+
+				// Keep listening for any final messages
+				time.Sleep(3 * time.Second)
+				return
+
+			case messages.ChatMessage:
+				// Verbose logging for received CHAT_MESSAGE
+				netio.VerboseEventLog(
+					"PokeProtocol: Received CHAT_MESSAGE",
+					&netio.LogOptions{
+						MessageParams: msg.MessageParams,
+					},
+				)
+
+				params := *msg.MessageParams
+				sender, _ := params["sender_name"].(string)
+				contentType, _ := params["content_type"].(string)
+
+				if contentType == "TEXT" {
+					if text, ok := params["message_text"].(string); ok && text != "" {
+						fmt.Printf("[%s]: %s\n", sender, text)
+					}
+				} else if contentType == "STICKER" {
+					if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
+						fmt.Printf("Debug: Spectator received sticker data, length: %d bytes, starts with '/': %v\n", len(stickerData), strings.HasPrefix(stickerData, "/"))
+						// Check if it's an ASCII art sticker (starts with /)
+						if strings.HasPrefix(stickerData, "/") {
+							if stickerText, exists := game.Stickers[strings.ToLower(stickerData)]; exists {
+								fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
+							} else {
+								fmt.Printf("[%s] sent an unknown sticker\n", sender)
+							}
+						} else {
+							// Handle Base64 encoded sticker (esticker)
+							fmt.Printf("Debug: Spectator processing Base64 esticker from %s\n", sender)
+							filename, err := game.SaveEsticker(stickerData, sender)
+							if err != nil {
+								fmt.Printf("[%s] sent an invalid esticker: %v\n", sender, err)
+							} else {
+								fmt.Printf("[%s] sent an esticker (saved as: %s)\n", sender, filename)
+							}
+						}
+					} else {
+						fmt.Printf("Debug: Spectator received STICKER message but no sticker_data found or empty\n")
 					}
 				}
 			}

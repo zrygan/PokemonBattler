@@ -33,8 +33,11 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 		switch msg.MessageType {
 		case messages.MMB_JOINING:
 			netio.VerboseEventLog(
-				"PokeProtocol: Host Peer detected Joiner Peer discovery message",
-				nil,
+				"PokeProtocol: Host Peer received MMB_JOINING discovery message",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+					MS:            rem.String(),
+				},
 			)
 
 			res := messages.MakeHostingMMB(self)
@@ -52,6 +55,14 @@ func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDes
 			)
 
 		case messages.SpectatorRequest:
+			netio.VerboseEventLog(
+				"PokeProtocol: Host Peer received SPECTATOR_REQUEST from new spectator",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+					MS:            rem.String(),
+				},
+			)
+
 			// Accept spectator automatically
 			spectatorName := "Spectator" + rem.String()
 			spectator := peer.MakePD(spectatorName, nil, rem)
