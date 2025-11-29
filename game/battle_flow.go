@@ -216,12 +216,22 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 					fmt.Printf("\n[%s]: %s\n", senderName, messageText)
 				}
 			} else if contentType == "STICKER" {
-				if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
-					// Display sticker with its visual representation
-					if stickerText, exists := Stickers[strings.ToLower(stickerID)]; exists {
-						fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+				if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
+					// Check if it's an ASCII art sticker (starts with /)
+					if strings.HasPrefix(stickerData, "/") {
+						if stickerText, exists := Stickers[strings.ToLower(stickerData)]; exists {
+							fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+						} else {
+							fmt.Printf("\n[%s] sent an unknown sticker\n", senderName)
+						}
 					} else {
-						fmt.Printf("\n[%s] sent a sticker\n", senderName)
+						// Handle Base64 encoded sticker (esticker)
+						filename, err := SaveEsticker(stickerData, senderName)
+						if err != nil {
+							fmt.Printf("\n[%s] sent an invalid esticker: %v\n", senderName, err)
+						} else {
+							fmt.Printf("\n[%s] sent an esticker (saved as: %s)\n", senderName, filename)
+						}
 					}
 				}
 			}

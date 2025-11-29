@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ func RunBattle(
 	}
 	fmt.Printf("Special Attack Boosts: %d\n", selfPlayer.SpecialAttackUsesLeft)
 	fmt.Printf("Special Defense Boosts: %d\n", selfPlayer.SpecialDefenseUsesLeft)
-	fmt.Println("\nTip: Type 'chat <message>' to send a chat message!")
+	fmt.Println("\nTip: Type 'chat <message>', use stickers like '/gg', or send image files with 'esticker <filepath>'!")
 	fmt.Println("Stickers: /smile /laugh /cool /angry /sad /love /fire /star /thumbsup /hi /gg /nice /wow /ouch /lucky /attack /defend /heal /critical /miss /hit")
 	fmt.Println("You can chat anytime during the battle, even during opponent's turn!")
 	fmt.Println()
@@ -125,7 +126,7 @@ func RunBattle(
 
 		if isMyTurn {
 			fmt.Println("Your turn!")
-			fmt.Println("Select a move (enter number) or 'chat <message>': ")
+			fmt.Println("Select a move (enter number), 'chat <message>', stickers (/gg), or 'esticker <filepath>': ")
 
 			// Get move selection using non-blocking input
 			moveIndex := -1
@@ -445,15 +446,27 @@ func ListenForMessages(
 func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, game *Game, messageText string) {
 	seqNum := 0 // Simple sequence for chat
 
-	// Check if it's a sticker command
+	// Check if it's a sticker command or esticker command
 	contentType := "TEXT"
-	stickerID := ""
+	stickerData := ""
 	displayText := messageText
 
-	if strings.HasPrefix(messageText, "/") {
+	// Check for esticker command first
+	if isEsticker, filePath := IsEstickerCommand(messageText); isEsticker {
+		base64Data, err := LoadEsticker(filePath)
+		if err != nil {
+			fmt.Printf("Error loading esticker: %v\n", err)
+			return
+		}
+		contentType = "STICKER"
+		stickerData = base64Data
+		displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
+		messageText = "" // Clear message text for stickers
+	} else if strings.HasPrefix(messageText, "/") {
+		// Check for regular ASCII art stickers
 		if stickerText, exists := Stickers[strings.ToLower(messageText)]; exists {
 			contentType = "STICKER"
-			stickerID = messageText
+			stickerData = messageText // For ASCII stickers, use the command as ID
 			displayText = stickerText
 			messageText = "" // Clear message text for stickers
 		}
@@ -463,7 +476,7 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 		selfPlayer.Peer.Name,
 		contentType,
 		messageText,
-		stickerID,
+		stickerData,
 		seqNum,
 	)
 
@@ -500,11 +513,22 @@ func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleCo
 			fmt.Printf("\n[%s]: %s\n", senderName, messageText)
 		}
 	} else if contentType == "STICKER" {
-		if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
-			if stickerText, exists := Stickers[strings.ToLower(stickerID)]; exists {
-				fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+		if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
+			// Check if it's an ASCII art sticker (starts with /)
+			if strings.HasPrefix(stickerData, "/") {
+				if stickerText, exists := Stickers[strings.ToLower(stickerData)]; exists {
+					fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
+				} else {
+					fmt.Printf("\n[%s] sent an unknown sticker\n", senderName)
+				}
 			} else {
-				fmt.Printf("\n[%s] sent a sticker\n", senderName)
+				// Handle Base64 encoded sticker (esticker)
+				filename, err := SaveEsticker(stickerData, senderName)
+				if err != nil {
+					fmt.Printf("\n[%s] sent an invalid esticker: %v\n", senderName, err)
+				} else {
+					fmt.Printf("\n[%s] sent an esticker (saved as: %s)\n", senderName, filename)
+				}
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,12 +30,8 @@ func main() {
 	fmt.Println()
 	defer self.Conn.Close()
 
-	// Discover hosts
+	// Discover hosts (will loop until a host is found)
 	host := discoverHost(self)
-	if host == nil {
-		fmt.Println("No hosts found. Exiting...")
-		return
-	}
 
 	// Send spectator request
 	fmt.Printf("\nLOG :: Requesting to spectate %s's battle\n", host.Name)
@@ -103,21 +100,27 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	}
 	fmt.Println()
 
-	if len(discoveredHosts) == 0 {
-		fmt.Println("No hosts found!")
-		fmt.Println("Make sure a host is running and in 'waiting for match' state.")
-		return nil
-	}
-
 	// Select host by name (same logic as joiner)
 	var hostDets []string = nil
 	hostName := ""
 	for hostDets == nil {
+		// If no hosts were found, show appropriate message
+		if len(discoveredHosts) == 0 {
+			fmt.Println("No hosts found!")
+			fmt.Println("Make sure a host is running and in 'waiting for match' state.")
+		}
+
 		hostName = netio.PRLine("Select a host to spectate... (or type /R to search again)")
 
 		// Check for restart command (case-insensitive)
 		if strings.ToUpper(hostName) == "/R" {
 			return discoverHost(self) // Recursively restart discovery
+		}
+
+		// If no hosts available, continue loop to allow /R again
+		if len(discoveredHosts) == 0 {
+			fmt.Println("No hosts available. Try /R to search again.")
+			continue
 		}
 
 		// Try exact match first, then case-insensitive
@@ -147,15 +150,27 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messageText string) {
 	seqNum := 0 // Simple sequence for chat
 
-	// Check if it's a sticker command
+	// Check if it's a sticker command or esticker command
 	contentType := "TEXT"
-	stickerID := ""
+	stickerData := ""
 	displayText := messageText
 
-	if strings.HasPrefix(messageText, "/") {
+	// Check for esticker command first
+	if isEsticker, filePath := game.IsEstickerCommand(messageText); isEsticker {
+		base64Data, err := game.LoadEsticker(filePath)
+		if err != nil {
+			fmt.Printf("Error loading esticker: %v\n", err)
+			return
+		}
+		contentType = "STICKER"
+		stickerData = base64Data
+		displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
+		messageText = "" // Clear message text for stickers
+	} else if strings.HasPrefix(messageText, "/") {
+		// Check for regular ASCII art stickers
 		if stickerText, exists := game.Stickers[strings.ToLower(messageText)]; exists {
 			contentType = "STICKER"
-			stickerID = messageText
+			stickerData = messageText // For ASCII stickers, use the command as ID
 			displayText = stickerText
 			messageText = "" // Clear message text for stickers
 		}
@@ -165,7 +180,7 @@ func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messa
 		self.Name,
 		contentType,
 		messageText,
-		stickerID,
+		stickerData,
 		seqNum,
 	)
 
@@ -184,7 +199,7 @@ func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messa
 func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 	fmt.Println("\n=== SPECTATING BATTLE ===")
 	fmt.Println("You are now observing the battle. Press Ctrl+C to exit.")
-	fmt.Println("Type 'chat <message>' or stickers like '/gg' and press Enter to send chat messages!")
+	fmt.Println("Type 'chat <message>', stickers like '/gg', or 'esticker <filepath>' to send messages!")
 	fmt.Println()
 
 	// Start goroutine to handle chat input from spectator
@@ -302,12 +317,22 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 					fmt.Printf("[%s]: %s\n", sender, text)
 				}
 			} else if contentType == "STICKER" {
-				if stickerID, ok := params["sticker_data"].(string); ok && stickerID != "" {
-					// Display sticker with its visual representation
-					if stickerText, exists := game.Stickers[strings.ToLower(stickerID)]; exists {
-						fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
+				if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
+					// Check if it's an ASCII art sticker (starts with /)
+					if strings.HasPrefix(stickerData, "/") {
+						if stickerText, exists := game.Stickers[strings.ToLower(stickerData)]; exists {
+							fmt.Printf("[%s] sent sticker: %s\n", sender, stickerText)
+						} else {
+							fmt.Printf("[%s] sent an unknown sticker\n", sender)
+						}
 					} else {
-						fmt.Printf("[%s] sent a sticker\n", sender)
+						// Handle Base64 encoded sticker (esticker)
+						filename, err := game.SaveEsticker(stickerData, sender)
+						if err != nil {
+							fmt.Printf("[%s] sent an invalid esticker: %v\n", sender, err)
+						} else {
+							fmt.Printf("[%s] sent an esticker (saved as: %s)\n", sender, filename)
+						}
 					}
 				}
 			}

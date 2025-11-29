@@ -17,6 +17,7 @@ A feature-rich, peer-to-peer Pokemon battle simulator implementing a custom Poke
 - **Spectator mode** for observing battles in real-time
 - **P2P and Broadcast communication modes** for flexible network setups
 - **24 built-in stickers** (/smile, /gg, /attack, /defend, etc.)
+- **Encoded sticker support (estickers)** - send 320×320px images directly in battle
 
 ### 🎭 **Pokemon Personality & Profile System** ⭐ *NEW!*
 - **Custom nicknames** with emoji support (name your Pikachu "Sparky⚡")
@@ -59,7 +60,8 @@ go run ./spectator/spectator.go
 
 ### 🎮 During Battle
 - Select moves (1-4) and decide on stat boost usage
-- **Chat anytime** with `chat <message>` or use stickers like `/gg`
+- **Chat anytime** with `chat <message>`, ASCII stickers like `/gg`, or encoded images with `esticker <filepath>`
+- **Send estickers** from any participant - Host, Joiner, or Spectators can all share images
 - Watch your Pokemon's **personality shine** through flavor text
 - See **real-time friendship updates** after each battle
 
@@ -197,16 +199,31 @@ chat Hello! Good luck!
 chat That was a great move!
 ```
 
-### Stickers
+### ASCII Stickers
 ```
 /smile   →  :)
 /gg      →  ASCII "GG"
 /fire    →  (~)
-/attack  →  >>--->>
+/attack  →  >>--->
 /defend  →  [SHIELD]
 /lucky   →  Lucky!
 /ouch    →  Ouch!
 ```
+
+### Encoded Stickers (Estickers)
+Send image files directly in battles (Host, Joiner, or Spectator):
+```
+esticker path/to/image.png
+esticker my_sticker.jpg
+esticker celebration.gif
+```
+
+**Requirements:**
+- Must be exactly 320px × 320px
+- File size under 10MB
+- Supports PNG, JPEG, GIF formats
+- Images are Base64 encoded for transmission
+- Received stickers are saved to `received_stickers/` directory
 
 ## 🏆 Advanced Features
 
