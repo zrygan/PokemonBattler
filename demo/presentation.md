@@ -2,8 +2,6 @@
 marp: true
 theme: default
 paginate: true
-header: 'P2P Pokémon Battle Protocol (PokeProtocol) Implementation'
-footer: 'CSNETWK Machine Problem 1T2526 | PokemonBattler Demo'
 ---
 
 # P2P Pokémon Battle Protocol Implementation
@@ -46,8 +44,6 @@ func StartListening(port string) *net.UDPConn {
 }
 ```
 
-**✅ Implemented:** UDP socket creation, binding, and efficient datagram handling
-
 ---
 
 ### Handshake Process (10 points)
@@ -74,8 +70,6 @@ func MakeHandshakeResponse(seed int) Message {
 }
 ```
 
-**✅ Implemented:** Complete handshake for Host, Joiner, and Spectator roles
-
 ---
 
 ### Message Serialization (10 points)
@@ -96,8 +90,6 @@ func (m Message) SerializeMessage() []byte {
 }
 ```
 
-**✅ Implemented:** Key-value pair format with newline delimiters as per RFC
-
 ---
 
 ## Game Logic & State Management (30 points)
@@ -117,7 +109,13 @@ func HandleBattleMessage(msg messages.Message, self peer.PeerDescriptor,
     case messages.DefenseAnnounce:
         // Step 2: Send defense acknowledgment
         sendDefenseAnnounce(self, opponent, commMode)
-        
+```
+
+---
+
+### Turn-Based Flow (15 points; *continuation*)
+
+```go  
     case messages.CalculationReport:
         // Step 3: Process damage calculation
         handleCalculationReport(msg, self, opponent, pokemon, commMode)
@@ -128,8 +126,6 @@ func HandleBattleMessage(msg messages.Message, self peer.PeerDescriptor,
     }
 }
 ```
-
-**✅ Implemented:** Complete 4-step turn flow with proper turn order reversal
 
 ---
 
@@ -152,8 +148,6 @@ func checkGameOver(pokemon *poke.Pokemon, opponent *poke.Pokemon,
 }
 ```
 
-**✅ Implemented:** Proper faint detection and GAME_OVER message transmission
-
 ---
 
 ### Battle State Synchronization (10 points)
@@ -174,8 +168,6 @@ func validateCalculation(received messages.Message, localDamage int,
 }
 ```
 
-**✅ Implemented:** HP and status synchronization with discrepancy detection
-
 ---
 
 ## Reliability & Error Handling (30 points)
@@ -191,7 +183,13 @@ type ReliableConnection struct {
     timeout        time.Duration
     maxRetries     int
 }
+```
 
+---
+
+### Sequence Numbers & ACKs (10 points; *cont*)
+
+```go
 func (rc *ReliableConnection) SendReliable(msg messages.Message, 
                                           dest *net.UDPAddr) (int, error) {
     seqNum := rc.GetNextSequenceNumber()
@@ -205,8 +203,6 @@ func (rc *ReliableConnection) SendReliable(msg messages.Message,
     return seqNum, rc.conn.WriteToUDP(msg.SerializeMessage(), dest)
 }
 ```
-
-**✅ Implemented:** Robust sequence numbering and ACK system
 
 ---
 
@@ -237,8 +233,6 @@ func (rc *ReliableConnection) CheckRetransmissions() []int {
 }
 ```
 
-**✅ Implemented:** 500ms timeout, 3 retry limit, packet loss simulation
-
 ---
 
 ### Discrepancy Resolution (10 points)
@@ -261,8 +255,6 @@ func MakeResolutionRequest(attacker, moveUsed string, damage, defenderHP,
 }
 ```
 
-**✅ Implemented:** CALCULATION_REPORT mismatch detection and resolution
-
 ---
 
 ## Features (25 points)
@@ -281,7 +273,11 @@ func calculateDamage(attacker, defender *poke.Pokemon, move poke.Move) int {
         attackerStat = float64(attacker.SpecialAttack)
         defenderStat = float64(defender.SpecialDefense)
     }
-    
+```
+---
+### Damage Calculation (10 points; *cont*)
+
+```
     // Type effectiveness calculation
     type1Eff := poke.GetTypeEffectiveness(move.Type, defender.Type1)
     type2Eff := poke.GetTypeEffectiveness(move.Type, defender.Type2)
@@ -295,8 +291,6 @@ func calculateDamage(attacker, defender *poke.Pokemon, move poke.Move) int {
     return damage
 }
 ```
-
-**✅ Implemented:** Accurate formula with Special Attack/Defense separation
 
 ---
 
@@ -319,8 +313,6 @@ func MakeChatMessage(sender, contentType, messageText, stickerData string,
     }
 }
 ```
-
-**✅ Implemented:** Asynchronous text chat without battle state disruption
 
 ---
 
@@ -349,8 +341,6 @@ func LoadEsticker(filePath string) (string, error) {
     return base64.StdEncoding.EncodeToString(fileBytes), nil
 }
 ```
-
-**✅ Implemented:** Base64 stickers with 320x320px validation, 10MB limit
 
 ---
 
@@ -381,8 +371,6 @@ func VerboseEventLog(event string, options *LogOptions) {
 }
 ```
 
-**✅ Implemented:** Comprehensive verbose logging with `-verbose` flag
-
 ---
 
 ## Code Quality & Design (10 points)
@@ -409,8 +397,6 @@ func HandleBattleMessage(msg messages.Message, self peer.PeerDescriptor,
 }
 ```
 
-**✅ Implemented:** Clear structure, comprehensive comments, readable code
-
 ---
 
 ### Separation of Concerns (5 points)
@@ -428,9 +414,7 @@ Project Structure:
 └── spectator/        # Spectator application entry point
 ```
 
-**✅ Implemented:** Clear separation between networking, game logic, and UI
-
----
+ ---
 
 ## Bonus Features (15 points)
 
@@ -447,7 +431,9 @@ type PokemonProfile struct {
     Victories    int         `json:"victories"`
     TotalBattles int         `json:"total_battles"`
 }
-
+```
+---
+```go
 func (p *PokemonProfile) SaveProfile(trainerName string) error {
     profileDir := filepath.Join(".", "profiles")
     os.MkdirAll(profileDir, 0755)
@@ -480,6 +466,9 @@ func (p *PokemonProfile) GetFlavorText(event string) string {
         case PersonalityJolly:
             return fmt.Sprintf("%s bounces excitedly onto the battlefield!", displayName)
         }
+```
+---
+```go
     case "critical_hit":
         switch p.Personality {
         case PersonalitySassy:
@@ -508,7 +497,9 @@ func (tm *TeamManager) CustomizePokemon(pokemon *Pokemon) (*PokemonProfile, erro
     
     // Create new profile with nickname and personality selection
     profile = NewPokemonProfile(pokemon.Name)
-    
+```
+---
+```go
     // Interactive nickname setting
     fmt.Print("\nGive your Pokemon a nickname (or press Enter to skip): ")
     nickname, _ := reader.ReadString('\n')
@@ -540,7 +531,9 @@ func (p *PokemonProfile) RecordDefeat() {
     p.TotalBattles++
     p.IncreaseFriendship(2) // Gain 2 friendship even in defeat
 }
-
+```
+---
+```go
 func (p *PokemonProfile) DisplayProfile() {
     displayName := p.GetDisplayName()
     fmt.Printf("\n=== %s ===\n", displayName)
@@ -552,7 +545,7 @@ func (p *PokemonProfile) DisplayProfile() {
         float64(p.Victories)/float64(max(p.TotalBattles, 1))*100)
 }
 ```
-
+ 
 ---
 
 ## Communication Modes Implementation
@@ -578,53 +571,6 @@ func sendMessage(msg messages.Message, self peer.PeerDescriptor,
 }
 ```
 
-**✅ Bonus Feature:** Complete team management with personality system, friendship tracking, and persistent profiles
-
----
-
-## Testing & Interoperability
-
-### Multi-Instance Testing
-- **Host Mode:** `go run . host -verbose`
-- **Joiner Mode:** `go run . joiner -verbose`  
-- **Spectator Mode:** `go run . spectator -verbose`
-
-### Protocol Compliance Verification
-```bash
-# Test P2P communication
-./pokemonbattler host -verbose &
-./pokemonbattler joiner -verbose
-
-# Test broadcast mode with spectators
-./pokemonbattler host -verbose &
-./pokemonbattler joiner -verbose &
-./pokemonbattler spectator -verbose
-```
-
-**✅ Verified:** Cross-platform compatibility, network interoperability
-
----
-
-## Demonstration Results
-
-### Scoring Summary
-- **Core Protocol:** 30/30 points ✅
-- **Game Logic:** 30/30 points ✅  
-- **Reliability:** 30/30 points ✅
-- **Features:** 25/25 points ✅
-- **Code Quality:** 10/10 points ✅
-- **Bonus Features:** 15/15 points ✅
-
-**Total Score:** 140/125 points (112% achievement)
-
-### Key Achievements
-- Full RFC compliance with PokeProtocol specification
-- Robust UDP reliability layer with packet loss handling
-- Advanced Pokemon team management system
-- Comprehensive verbose logging for protocol debugging
-- Multi-role support (Host/Joiner/Spectator)
-- Dual communication modes (P2P/Broadcast)
-
 ---
 
 ## AI Usage Acknowledgment
@@ -644,15 +590,3 @@ func sendMessage(msg messages.Message, self peer.PeerDescriptor,
 ---
 
 ## Thank You
-
-### Questions & Demo
-
-**Ready for:**
-- Live protocol demonstration
-- Interoperability testing with other implementations
-- Code walkthrough and explanation
-- Battle simulation and spectator features
-
-**Contact:** zrygan  
-**Repository:** PokemonBattler  
-**Protocol Version:** PokeProtocol v1.0 (RFC Compliant)
