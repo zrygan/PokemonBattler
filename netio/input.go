@@ -52,7 +52,7 @@ func StartInputListener() chan string {
 // ERLine (ERror Line) displays an error message, terminates when required
 // by shouldStop.
 func ERLine(errorcode string, shouldStop bool) {
-	err := "🛑 Error: " + errorcode
+	err := "Error: " + errorcode
 	if shouldStop {
 		panic(err)
 	}

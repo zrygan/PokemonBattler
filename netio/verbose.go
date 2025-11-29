@@ -28,7 +28,7 @@ func VerboseEventLog(message string, opts *LogOptions) {
 		return
 	}
 
-	fmt.Print("📡 PokeProtocol :: ", message)
+	fmt.Print("PokeProtocol :: ", message)
 
 	if opts == nil {
 		fmt.Printf("\n\n")
