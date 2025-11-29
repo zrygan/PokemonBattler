@@ -44,7 +44,7 @@ func lookForMatch() map[string]string {
 	discoveredHosts := make(map[string]string)
 
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, 65535)
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			break
@@ -137,7 +137,7 @@ func handshake(self peer.PeerDescriptor, host peer.PeerDescriptor) int {
 		panic(err)
 	}
 
-	buf := make([]byte, 1024)
+	buf := make([]byte, 65535)
 
 	for {
 		n, _, err := self.Conn.ReadFromUDP(buf)

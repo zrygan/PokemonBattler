@@ -39,7 +39,7 @@ func Host_setCMode(host peer.PeerDescriptor, join peer.PeerDescriptor) string {
 }
 
 func Joiner_getCMode(p peer.PeerDescriptor) string {
-	buf := make([]byte, 1000)
+	buf := make([]byte, 65535)
 
 	for {
 		n, _, err := p.Conn.ReadFromUDP(buf)
@@ -182,7 +182,7 @@ func BattleSetup(self player.Player, other peer.PeerDescriptor, cmode string, sp
 	)
 
 	// Wait for received BATTLE_SETUP
-	buf := make([]byte, 1000)
+	buf := make([]byte, 65535)
 	for {
 		n, addr, err := self.Peer.Conn.ReadFromUDP(buf)
 		if err != nil {

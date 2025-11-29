@@ -275,12 +275,14 @@ func (bc *BattleContext) calculateDamage(
 }
 
 func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, error) {
-	buf := make([]byte, 65535)
+	buf := make([]byte, 100000) // Increased from 64KB to 100KB for large estickers
 	for {
 		n, addr, err := bc.SelfPlayer.Peer.Conn.ReadFromUDP(buf)
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Printf("DEBUG: Received UDP packet from %s, size: %d bytes\n", addr.String(), n)
 
 		msg := messages.DeserializeMessage(buf[:n])
 
@@ -317,14 +319,18 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 			senderName, _ := params["sender_name"].(string)
 			contentType, _ := params["content_type"].(string)
 
+			fmt.Printf("DEBUG: battle_flow.go received chat from %s, type: %s\n", senderName, contentType)
+
 			if contentType == "TEXT" {
 				if messageText, ok := params["message_text"].(string); ok && messageText != "" {
 					fmt.Printf("\n[%s]: %s\n", senderName, messageText)
 				}
 			} else if contentType == "STICKER" {
 				if stickerData, ok := params["sticker_data"].(string); ok && stickerData != "" {
+					fmt.Printf("DEBUG: Processing STICKER message, data length: %d\n", len(stickerData))
 					// Check if it's an ASCII art sticker (starts with /)
 					if strings.HasPrefix(stickerData, "/") {
+						fmt.Printf("DEBUG: Processing ASCII sticker\n")
 						if stickerText, exists := Stickers[strings.ToLower(stickerData)]; exists {
 							fmt.Printf("\n[%s] sent sticker: %s\n", senderName, stickerText)
 						} else {
@@ -332,6 +338,7 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 						}
 					} else {
 						// Handle Base64 encoded sticker (esticker)
+						fmt.Printf("DEBUG: Processing Base64 esticker\n")
 						filename, err := SaveEsticker(stickerData, senderName)
 						if err != nil {
 							fmt.Printf("\n[%s] sent an invalid esticker: %v\n", senderName, err)
@@ -339,7 +346,14 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 							fmt.Printf("\n[%s] sent an esticker (saved as: %s)\n", senderName, filename)
 						}
 					}
+				} else {
+					fmt.Printf("DEBUG: STICKER message but no sticker_data or empty\n")
 				}
+			}
+
+			// Send ACK for chat message
+			if seqNum, ok := params["sequence_number"].(int); ok {
+				bc.ReliableConn.SendAck(seqNum, addr)
 			}
 
 			// Host relays chat messages according to communication mode

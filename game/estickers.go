@@ -17,8 +17,8 @@ import (
 
 const (
 	MaxStickerSize = 10 * 1024 * 1024 // 10MB
-	RequiredWidth  = 320
-	RequiredHeight = 320
+	RequiredWidth  = 160              // Reduced from 320 to fit UDP limits
+	RequiredHeight = 160              // Reduced from 320 to fit UDP limits
 	StickerSaveDir = "received_stickers"
 )
 
@@ -61,7 +61,7 @@ func LoadEsticker(filePath string) (string, error) {
 	height := bounds.Dy()
 
 	if width != RequiredWidth || height != RequiredHeight {
-		return "", fmt.Errorf("invalid sticker dimensions: %dx%d (required: exactly %dx%d pixels)\nTip: Resize your image to exactly 320x320 pixels before sending as an esticker", width, height, RequiredWidth, RequiredHeight)
+		return "", fmt.Errorf("invalid sticker dimensions: %dx%d (required: exactly %dx%d pixels)\nTip: Resize your image to exactly %dx%d pixels before sending as an esticker", width, height, RequiredWidth, RequiredHeight, RequiredWidth, RequiredHeight)
 	}
 
 	// Encode to Base64
@@ -139,10 +139,13 @@ func SaveEsticker(base64Data string, senderName string) (string, error) {
 
 // IsEstickerCommand checks if a command is an esticker command
 func IsEstickerCommand(input string) (bool, string) {
+	fmt.Printf("DEBUG: Checking if '%s' is esticker command\n", input)
 	if strings.HasPrefix(input, "esticker ") && len(input) > 9 {
 		filePath := strings.TrimSpace(input[9:])
+		fmt.Printf("DEBUG: Detected esticker command, extracted file path: '%s'\n", filePath)
 		return true, filePath
 	}
+	fmt.Printf("DEBUG: Not an esticker command\n")
 	return false, ""
 }
 

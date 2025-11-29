@@ -107,7 +107,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 	// make a map of discovered hosts (same format as joiner)
 	discoveredHosts := make(map[string]string)
 
-	buf := make([]byte, 1024)
+	buf := make([]byte, 65535)
 	for {
 		n, _, err := self.Conn.ReadFromUDP(buf)
 		if err != nil {

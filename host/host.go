@@ -18,7 +18,7 @@ import (
 // It handles discovery messages (MMB_JOINING) and handshake requests.
 // Returns a PeerDescriptor for the accepted joiner and a slice of spectators.
 func waitForMatch(self peer.PeerDescriptor) (peer.PeerDescriptor, []peer.PeerDescriptor) {
-	buf := make([]byte, 1024)
+	buf := make([]byte, 65535)
 	spectators := make([]peer.PeerDescriptor, 0)
 
 	for {

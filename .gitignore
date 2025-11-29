@@ -49,3 +49,6 @@ spectator.exe
 
 # Binary files
 bin/
+
+# Received Stickers
+received_stickers/

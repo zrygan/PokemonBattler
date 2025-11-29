@@ -160,7 +160,7 @@ func RunBattle(
 					}
 				default:
 					// Check for incoming network messages (chat from opponent)
-					buf := make([]byte, 65535)
+					buf := make([]byte, 100000) // Increased for large estickers
 					selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
 					n, addr, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
 					if err == nil {
@@ -190,7 +190,7 @@ func RunBattle(
 						boostSelected = true
 					default:
 						// Check for incoming network messages
-						buf := make([]byte, 65535)
+						buf := make([]byte, 100000) // Increased for large estickers
 						selfPlayer.Peer.Conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
 						n, addr, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
 						if err == nil {
@@ -447,7 +447,7 @@ func ListenForMessages(
 	reliableConn *reliability.ReliableConnection,
 	chatHandler func(msg *messages.Message),
 ) {
-	buf := make([]byte, 65535)
+	buf := make([]byte, 16777216) // 2^24 for large messages (i.e., stickers)
 	for {
 		n, addr, err := selfPlayer.Peer.Conn.ReadFromUDP(buf)
 		if err != nil {
@@ -478,6 +478,7 @@ func ListenForMessages(
 
 // sendChatMessage sends a chat message or sticker to the opponent and spectators
 func sendChatMessage(battleCtx *BattleContext, messageText string) {
+	fmt.Printf("DEBUG: sendChatMessage called with input: '%s'\n", messageText)
 	seqNum := battleCtx.ReliableConn.GetNextSequenceNumber()
 
 	// Check if it's a sticker command or esticker command
@@ -487,6 +488,7 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 
 	// Check for esticker command first
 	if isEsticker, filePath := IsEstickerCommand(messageText); isEsticker {
+		fmt.Printf("DEBUG: Processing esticker command, file path: '%s'\n", filePath)
 		base64Data, err := LoadEsticker(filePath)
 		if err != nil {
 			fmt.Printf("Error loading esticker: %v\n", err)
@@ -495,10 +497,12 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 			contentType = "TEXT"
 			displayText = messageText
 		} else {
+			fmt.Printf("DEBUG: Successfully loaded esticker, Base64 length: %d bytes\n", len(base64Data))
 			contentType = "STICKER"
 			stickerData = base64Data
 			displayText = fmt.Sprintf("[Encoded Sticker: %s]", filepath.Base(filePath))
 			messageText = "" // Clear message text for stickers
+			fmt.Printf("DEBUG: Esticker prepared for sending\n")
 		}
 	} else if strings.HasPrefix(messageText, "/") {
 		// Check for regular ASCII art stickers
@@ -519,6 +523,7 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 	)
 
 	msgBytes := msg.SerializeMessage()
+	fmt.Printf("DEBUG: Message serialized, total size: %d bytes\n", len(msgBytes))
 
 	// Verbose logging for CHAT_MESSAGE
 	netio.VerboseEventLog(
@@ -529,15 +534,20 @@ func sendChatMessage(battleCtx *BattleContext, messageText string) {
 	)
 
 	// Send chat message according to communication mode
+	fmt.Printf("DEBUG: Sending message via communication mode: %s\n", battleCtx.Game.CommunicationMode)
+	fmt.Printf("DEBUG: Opponent address: %s\n", battleCtx.OpponentAddr.String())
 	switch battleCtx.Game.CommunicationMode {
 	case "P": // P2P mode - direct to opponent, explicit spectator broadcast
-		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		n, err := battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		fmt.Printf("DEBUG: UDP WriteToUDP result: %d bytes sent, err: %v\n", n, err)
 		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	case "B": // Broadcast mode - send to opponent AND spectators simultaneously
-		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		n, err := battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		fmt.Printf("DEBUG: UDP WriteToUDP result: %d bytes sent, err: %v\n", n, err)
 		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	default: // Default to P2P behavior
-		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		n, err := battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		fmt.Printf("DEBUG: UDP WriteToUDP result: %d bytes sent, err: %v\n", n, err)
 		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	}
 
@@ -562,6 +572,8 @@ func processIncomingChat(msg *messages.Message, isHost bool, battleCtx *BattleCo
 	params := *msg.MessageParams
 	senderName, _ := params["sender_name"].(string)
 	contentType, _ := params["content_type"].(string)
+
+	fmt.Printf("DEBUG: Received chat message from %s, content type: %s\n", senderName, contentType)
 
 	if contentType == "TEXT" {
 		if messageText, ok := params["message_text"].(string); ok && messageText != "" {
