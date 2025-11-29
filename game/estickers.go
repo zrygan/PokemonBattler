@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"image"
@@ -51,7 +52,7 @@ func LoadEsticker(filePath string) (string, error) {
 	}
 
 	// Decode image to check dimensions
-	img, format, err := image.Decode(strings.NewReader(string(fileData)))
+	img, format, err := image.Decode(bytes.NewReader(fileData))
 	if err != nil {
 		return "", fmt.Errorf("failed to decode image: %v", err)
 	}
@@ -88,7 +89,7 @@ func SaveEsticker(base64Data string, senderName string) (string, error) {
 	}
 
 	// Decode image to validate and get format
-	img, format, err := image.Decode(strings.NewReader(string(data)))
+	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return "", fmt.Errorf("failed to decode sticker image: %v", err)
 	}

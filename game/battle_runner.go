@@ -136,19 +136,19 @@ func RunBattle(
 					// Check if it's a chat command
 					if len(input) > 5 && input[:5] == "chat " {
 						chatText := input[5:]
-						sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+						sendChatMessage(battleCtx, chatText)
 						continue
 					}
 
 					// Check if it's an esticker command
 					if strings.HasPrefix(input, "esticker ") {
-						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						sendChatMessage(battleCtx, input)
 						continue
 					}
 
 					// Check if it's a sticker
 					if strings.HasPrefix(input, "/") {
-						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						sendChatMessage(battleCtx, input)
 						continue
 					}
 
@@ -322,16 +322,16 @@ func RunBattle(
 					// Check if it's a chat command
 					if len(input) > 5 && input[:5] == "chat " {
 						chatText := input[5:]
-						sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+						sendChatMessage(battleCtx, chatText)
 					} else if strings.HasPrefix(input, "esticker ") {
 						// Treat as esticker command
-						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						sendChatMessage(battleCtx, input)
 					} else if strings.HasPrefix(input, "/") {
 						// Treat as sticker
-						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						sendChatMessage(battleCtx, input)
 					} else {
 						// Treat as regular message
-						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						sendChatMessage(battleCtx, input)
 					}
 				}
 			}
@@ -476,8 +476,8 @@ func ListenForMessages(
 }
 
 // sendChatMessage sends a chat message or sticker to the opponent and spectators
-func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, game *Game, messageText string) {
-	seqNum := 0 // Simple sequence for chat
+func sendChatMessage(battleCtx *BattleContext, messageText string) {
+	seqNum := battleCtx.ReliableConn.GetNextSequenceNumber()
 
 	// Check if it's a sticker command or esticker command
 	contentType := "TEXT"
@@ -506,7 +506,7 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	}
 
 	msg := messages.MakeChatMessage(
-		selfPlayer.Peer.Name,
+		battleCtx.SelfPlayer.Peer.Name,
 		contentType,
 		messageText,
 		stickerData,
@@ -524,16 +524,16 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	)
 
 	// Send chat message according to communication mode
-	switch game.CommunicationMode {
+	switch battleCtx.Game.CommunicationMode {
 	case "P": // P2P mode - direct to opponent, explicit spectator broadcast
-		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
-		game.BroadcastToSpectators(msgBytes)
+		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	case "B": // Broadcast mode - send to opponent AND spectators simultaneously
-		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
-		game.BroadcastToSpectators(msgBytes)
+		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	default: // Default to P2P behavior
-		selfPlayer.Peer.Conn.WriteToUDP(msgBytes, opponentPlayer.Peer.Addr)
-		game.BroadcastToSpectators(msgBytes)
+		battleCtx.SelfPlayer.Peer.Conn.WriteToUDP(msgBytes, battleCtx.OpponentAddr)
+		battleCtx.Game.BroadcastToSpectators(msgBytes)
 	}
 
 	if contentType == "STICKER" {

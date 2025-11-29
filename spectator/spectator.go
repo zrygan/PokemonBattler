@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zrygan/pokemonbattler/game"
@@ -15,6 +16,19 @@ import (
 	"github.com/zrygan/pokemonbattler/peer"
 	monsters "github.com/zrygan/pokemonbattler/poke/mons"
 )
+
+// Global sequence number for spectator chat messages
+var (
+	spectatorSeqNum int
+	seqMutex        sync.Mutex
+)
+
+func getNextSpectatorSeqNum() int {
+	seqMutex.Lock()
+	defer seqMutex.Unlock()
+	spectatorSeqNum++
+	return spectatorSeqNum
+}
 
 func main() {
 	// Parse command-line flags
@@ -167,7 +181,7 @@ func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
 
 // sendSpectatorChat sends a chat message or sticker from spectator to host
 func sendSpectatorChat(self peer.PeerDescriptor, host peer.PeerDescriptor, messageText string) {
-	seqNum := 0 // Simple sequence for chat
+	seqNum := getNextSpectatorSeqNum()
 
 	// Check if it's a sticker command or esticker command
 	contentType := "TEXT"
@@ -261,6 +275,14 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 
 		switch msg.MessageType {
 		case messages.BattleSetup:
+			// Verbose logging for received BATTLE_SETUP
+			netio.VerboseEventLog(
+				"PokeProtocol: Received BATTLE_SETUP from host",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			params := *msg.MessageParams
 			pokemonName := params["pokemon_name"].(string)
 
@@ -285,11 +307,27 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			}
 
 		case messages.AttackAnnounce:
+			// Verbose logging for received ATTACK_ANNOUNCE
+			netio.VerboseEventLog(
+				"PokeProtocol: Received ATTACK_ANNOUNCE",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			params := *msg.MessageParams
 			moveName := params["move_name"].(string)
 			fmt.Printf("Attack announced: %s\n", moveName)
 
 		case messages.CalculationReport:
+			// Verbose logging for received CALCULATION_REPORT
+			netio.VerboseEventLog(
+				"PokeProtocol: Received CALCULATION_REPORT",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			params := *msg.MessageParams
 			attacker := params["attacker"].(string)
 			moveName := params["move_used"].(string)
@@ -313,6 +351,14 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			fmt.Printf("   %s: %d/%d\n\n", joinerPokemon, joinerHP, joinerMaxHP)
 
 		case messages.GameOver:
+			// Verbose logging for received GAME_OVER
+			netio.VerboseEventLog(
+				"PokeProtocol: Received GAME_OVER",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			params := *msg.MessageParams
 			winner := params["winner"].(string)
 			loser := params["loser"].(string)
@@ -327,6 +373,14 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			return
 
 		case messages.ChatMessage:
+			// Verbose logging for received CHAT_MESSAGE
+			netio.VerboseEventLog(
+				"PokeProtocol: Received CHAT_MESSAGE",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+				},
+			)
+
 			params := *msg.MessageParams
 			sender, _ := params["sender_name"].(string)
 			contentType, _ := params["content_type"].(string)

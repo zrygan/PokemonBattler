@@ -44,19 +44,6 @@ func (bc *BattleContext) broadcastToSpectatorsExcept(msg []byte, exceptAddr *net
 	}
 }
 
-// sendMessage sends a message according to the communication mode
-func (bc *BattleContext) sendMessage(msg []byte, target peer.PeerDescriptor) {
-	switch bc.Game.CommunicationMode {
-	case "P": // P2P mode - direct send only
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
-	case "B": // Broadcast mode - send to target and broadcast to spectators
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
-		bc.broadcastToSpectators(msg)
-	default: // Default to P2P behavior
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
-	}
-}
-
 // ProcessTurn handles the attack, defense, and calculation phases of a turn.
 func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool) error {
 	isMyTurn := (bc.IsHost && bc.Game.CurrentTurn == "host") ||
@@ -279,6 +266,15 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 
 		// Ignore chat messages - they're handled by background listener
 		if msg.MessageType == messages.ChatMessage {
+			// Verbose logging for received CHAT_MESSAGE
+			netio.VerboseEventLog(
+				"PokeProtocol: Received CHAT_MESSAGE",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+					MS:            addr.String(),
+				},
+			)
+
 			// Display the chat message inline
 			params := *msg.MessageParams
 			senderName, _ := params["sender_name"].(string)
@@ -336,11 +332,29 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 
 		// Check for GAME_OVER message - opponent's pokemon fainted
 		if msg.MessageType == messages.GameOver {
+			// Verbose logging for received GAME_OVER
+			netio.VerboseEventLog(
+				"PokeProtocol: Received GAME_OVER from opponent",
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+					MS:            addr.String(),
+				},
+			)
+
 			bc.Game.State = StateGameOver
 			return msg, fmt.Errorf("opponent_fainted")
 		}
 
 		if msg.MessageType == msgType {
+			// Verbose logging for received battle message
+			netio.VerboseEventLog(
+				fmt.Sprintf("PokeProtocol: Received %s from opponent", msgType),
+				&netio.LogOptions{
+					MessageParams: msg.MessageParams,
+					MS:            addr.String(),
+				},
+			)
+
 			return msg, nil
 		}
 	}
@@ -374,46 +388,12 @@ func (bc *BattleContext) makeCalculationReport(
 	)
 }
 
-func (bc *BattleContext) verifyCalculations(msg1 messages.Message, msg2 *messages.Message) bool {
-	params1 := *msg1.MessageParams
-	params2 := *msg2.MessageParams
-
-	return params1["damage_dealt"] == params2["damage_dealt"] &&
-		params1["defender_hp_remaining"] == params2["defender_hp_remaining"]
-}
-
-func (bc *BattleContext) handleCalculationDiscrepancy(myCalc messages.Message) error {
-	seqNum := bc.ReliableConn.GetNextSequenceNumber()
-	params := *myCalc.MessageParams
-
-	resMsg := messages.MakeResolutionRequest(
-		params["attacker"].(string),
-		params["move_used"].(string),
-		params["damage_dealt"].(int),
-		params["defender_hp_remaining"].(int),
-		seqNum,
-	)
-
-	bc.SelfPlayer.Peer.Conn.WriteToUDP(resMsg.SerializeMessage(), bc.OpponentAddr)
-
-	return fmt.Errorf("calculation discrepancy detected")
-}
-
 func (bc *BattleContext) switchTurn() {
 	if bc.Game.CurrentTurn == "host" {
 		bc.Game.CurrentTurn = "joiner"
 	} else {
 		bc.Game.CurrentTurn = "host"
 	}
-}
-
-func (bc *BattleContext) findMoveByName(pokemon *poke.Pokemon, moveName string) poke.Move {
-	for _, move := range pokemon.Moves {
-		if move.Name == moveName {
-			return move
-		}
-	}
-	return poke.Move{Name: moveName, BasePower: 50, Type: "normal", DamageCategory: poke.Physical}
 }
 
 func getOpponentPokemon(bc *BattleContext) *poke.Pokemon {
