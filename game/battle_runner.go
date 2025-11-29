@@ -140,6 +140,12 @@ func RunBattle(
 						continue
 					}
 
+					// Check if it's an esticker command
+					if strings.HasPrefix(input, "esticker ") {
+						sendChatMessage(selfPlayer, opponentPlayer, game, input)
+						continue
+					}
+
 					// Check if it's a sticker
 					if strings.HasPrefix(input, "/") {
 						sendChatMessage(selfPlayer, opponentPlayer, game, input)
@@ -317,6 +323,9 @@ func RunBattle(
 					if len(input) > 5 && input[:5] == "chat " {
 						chatText := input[5:]
 						sendChatMessage(selfPlayer, opponentPlayer, game, chatText)
+					} else if strings.HasPrefix(input, "esticker ") {
+						// Treat as esticker command
+						sendChatMessage(selfPlayer, opponentPlayer, game, input)
 					} else if strings.HasPrefix(input, "/") {
 						// Treat as sticker
 						sendChatMessage(selfPlayer, opponentPlayer, game, input)
