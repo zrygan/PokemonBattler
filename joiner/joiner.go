@@ -186,42 +186,53 @@ func main() {
 	self := peer.MakePDFromLogin("joiner")
 	defer self.Conn.Close()
 
-	// Allow restarting host discovery
-	var host *peer.PeerDescriptor
-	var seed int
+	// Main joiner loop - keep looking for battles
 	for {
-		for host == nil {
-			availableHosts := lookForMatch()
-			host = selectMatch(availableHosts)
+		fmt.Println("\n=== LOOKING FOR BATTLE ===")
+		fmt.Println("Searching for hosts...")
 
-			if host == nil {
-				fmt.Println("\n--- Restarting host discovery ---")
+		// Allow restarting host discovery
+		var host *peer.PeerDescriptor
+		var seed int
+		for {
+			for host == nil {
+				availableHosts := lookForMatch()
+				host = selectMatch(availableHosts)
+
+				if host == nil {
+					fmt.Println("\n--- Restarting host discovery ---")
+				}
 			}
+
+			// when selectMatch returns, initialize a handshake
+			seed = handshake(self, *host)
+
+			// Check if handshake was rejected
+			if seed == -1 {
+				fmt.Println("Searching for hosts again...")
+				host = nil // Reset host to restart discovery
+				continue
+			}
+
+			// Handshake successful, break out of loop
+			break
 		}
 
-		// when selectMatch returns, initialize a handshake
-		seed = handshake(self, *host)
+		// get the communication mode from the host
+		cmode := game.Joiner_getCMode(self)
 
-		// Check if handshake was rejected
-		if seed == -1 {
-			fmt.Println("Searching for hosts again...")
-			host = nil // Reset host to restart discovery
-			continue
-		}
+		// create joiner's player
+		p := game.PlayerSetUp(self)
 
-		// Handshake successful, break out of loop
-		break
+		// exchange BattleSetup and get opponent player info
+		opponentPlayer := game.BattleSetup(p, *host, cmode, []peer.PeerDescriptor{})
+
+		// Start the battle (joiner has no spectators)
+		game.RunBattle(&p, &opponentPlayer, seed, cmode, false, []peer.PeerDescriptor{})
+
+		// Battle ended, return to main menu
+		fmt.Println("\n=== BATTLE COMPLETED ===")
+		fmt.Println("Returning to joiner menu...")
+		time.Sleep(2 * time.Second)
 	}
-
-	// get the communication mode from the host
-	cmode := game.Joiner_getCMode(self)
-
-	// create joiner's player
-	p := game.PlayerSetUp(self)
-
-	// exchange BattleSetup and get opponent player info
-	opponentPlayer := game.BattleSetup(p, *host, cmode, []peer.PeerDescriptor{})
-
-	// Start the battle (joiner has no spectators)
-	game.RunBattle(&p, &opponentPlayer, seed, cmode, false, []peer.PeerDescriptor{})
 }

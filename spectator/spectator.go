@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,16 +31,34 @@ func main() {
 	fmt.Println()
 	defer self.Conn.Close()
 
-	// Discover hosts (will loop until a host is found)
-	host := discoverHost(self)
+	// Main spectator loop - keep looking for battles
+	for {
+		// Discover hosts (will loop until a host is found)
+		host := discoverHost(self)
 
-	// Send spectator request
-	fmt.Printf("\nLOG :: Requesting to spectate %s's battle\n", host.Name)
-	spectatorReq := messages.MakeSpectatorRequest()
-	self.Conn.WriteToUDP(spectatorReq.SerializeMessage(), host.Addr)
+		// Send spectator request
+		fmt.Printf("\nLOG :: Requesting to spectate %s's battle\n", host.Name)
+		spectatorReq := messages.MakeSpectatorRequest()
+		self.Conn.WriteToUDP(spectatorReq.SerializeMessage(), host.Addr)
 
-	// Wait for battle to start and observe
-	observeBattle(self, host)
+		// Verbose logging for SPECTATOR_REQUEST
+		netio.VerboseEventLog(
+			"PokeProtocol: Sent SPECTATOR_REQUEST to host",
+			&netio.LogOptions{
+				Name: host.Name,
+				IP:   host.Addr.IP.String(),
+				Port: strconv.Itoa(host.Addr.Port),
+			},
+		)
+
+		// Wait for battle to start and observe
+		observeBattle(self, host)
+
+		// Battle ended, return to main menu
+		fmt.Println("\n=== RETURNING TO MAIN MENU ===")
+		fmt.Println("Looking for another battle...")
+		fmt.Println()
+	}
 }
 
 func discoverHost(self peer.PeerDescriptor) *peer.PeerDescriptor {
@@ -301,7 +320,7 @@ func observeBattle(self peer.PeerDescriptor, host *peer.PeerDescriptor) {
 			fmt.Printf("\n=== BATTLE END ===\n")
 			fmt.Printf("Winner: %s\n", winner)
 			fmt.Printf("Loser: %s\n", loser)
-			fmt.Println("\nBattle has ended. Press Ctrl+C to exit.")
+			fmt.Println("\nBattle has ended. Returning to main menu...")
 
 			// Keep listening for any final messages
 			time.Sleep(3 * time.Second)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/zrygan/pokemonbattler/game/player"
 	"github.com/zrygan/pokemonbattler/messages"
+	"github.com/zrygan/pokemonbattler/netio"
 	"github.com/zrygan/pokemonbattler/peer"
 	"github.com/zrygan/pokemonbattler/poke"
 	"github.com/zrygan/pokemonbattler/reliability"
@@ -70,11 +71,27 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		bc.SelfPlayer.Peer.Conn.WriteToUDP(attackMsgBytes, bc.OpponentAddr)
 		bc.broadcastToSpectators(attackMsgBytes)
 
+		// Verbose logging for ATTACK_ANNOUNCE
+		netio.VerboseEventLog(
+			"PokeProtocol: Sent ATTACK_ANNOUNCE to opponent",
+			&netio.LogOptions{
+				MessageParams: attackMsg.MessageParams,
+			},
+		)
+
 		// Wait for DEFENSE_ANNOUNCE
-		_, err := bc.waitForMessage(messages.DefenseAnnounce)
+		defenseMsg, err := bc.waitForMessage(messages.DefenseAnnounce)
 		if err != nil {
 			return err
 		}
+
+		// Verbose logging for received DEFENSE_ANNOUNCE
+		netio.VerboseEventLog(
+			"PokeProtocol: Received DEFENSE_ANNOUNCE from opponent",
+			&netio.LogOptions{
+				MessageParams: defenseMsg.MessageParams,
+			},
+		)
 
 		// Calculate damage (attacker's calculation is authoritative)
 		opponentPokemon := getOpponentPokemon(bc)
@@ -109,16 +126,32 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		bc.SelfPlayer.Peer.Conn.WriteToUDP(calcMsgBytes, bc.OpponentAddr)
 		bc.broadcastToSpectators(calcMsgBytes)
 
+		// Verbose logging for CALCULATION_REPORT
+		netio.VerboseEventLog(
+			"PokeProtocol: Sent CALCULATION_REPORT to opponent",
+			&netio.LogOptions{
+				MessageParams: calcMsg.MessageParams,
+			},
+		)
+
 		// Log the attack
 		logEntry := fmt.Sprintf("%s used %s and dealt %d damage to opponent (HP: %d)",
 			bc.SelfPlayer.PokemonStruct.Name, selectedMove.Name, damage, projectedHP)
 		bc.Game.BattleLog = append(bc.Game.BattleLog, logEntry)
 
 		// Wait for CALCULATION_CONFIRM from defender
-		_, err = bc.waitForMessage(messages.CalculationConfirm)
+		confirmMsg, err := bc.waitForMessage(messages.CalculationConfirm)
 		if err != nil {
 			return err
 		}
+
+		// Verbose logging for received CALCULATION_CONFIRM
+		netio.VerboseEventLog(
+			"PokeProtocol: Received CALCULATION_CONFIRM from opponent",
+			&netio.LogOptions{
+				MessageParams: confirmMsg.MessageParams,
+			},
+		)
 
 		// Switch turns
 		bc.switchTurn()
@@ -131,16 +164,40 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 			return err
 		}
 
+		// Verbose logging for received ATTACK_ANNOUNCE
+		netio.VerboseEventLog(
+			"PokeProtocol: Received ATTACK_ANNOUNCE from opponent",
+			&netio.LogOptions{
+				MessageParams: attackMsg.MessageParams,
+			},
+		)
+
 		// Send DEFENSE_ANNOUNCE
 		seqNum := bc.ReliableConn.GetNextSequenceNumber()
 		defenseMsg := messages.MakeDefenseAnnounce(seqNum)
 		bc.SelfPlayer.Peer.Conn.WriteToUDP(defenseMsg.SerializeMessage(), bc.OpponentAddr)
+
+		// Verbose logging for sent DEFENSE_ANNOUNCE
+		netio.VerboseEventLog(
+			"PokeProtocol: Sent DEFENSE_ANNOUNCE to opponent",
+			&netio.LogOptions{
+				MessageParams: defenseMsg.MessageParams,
+			},
+		)
 
 		// Wait for attacker's CALCULATION_REPORT
 		calcMsg, err := bc.waitForMessage(messages.CalculationReport)
 		if err != nil {
 			return err
 		}
+
+		// Verbose logging for received CALCULATION_REPORT
+		netio.VerboseEventLog(
+			"PokeProtocol: Received CALCULATION_REPORT from opponent",
+			&netio.LogOptions{
+				MessageParams: calcMsg.MessageParams,
+			},
+		)
 
 		// Extract damage from calculation report
 		damage := (*calcMsg.MessageParams)["damage_dealt"].(int)
@@ -153,6 +210,14 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		seqNum = bc.ReliableConn.GetNextSequenceNumber()
 		confirmMsg := messages.MakeCalculationConfirm(seqNum)
 		bc.SelfPlayer.Peer.Conn.WriteToUDP(confirmMsg.SerializeMessage(), bc.OpponentAddr)
+
+		// Verbose logging for sent CALCULATION_CONFIRM
+		netio.VerboseEventLog(
+			"PokeProtocol: Sent CALCULATION_CONFIRM to opponent",
+			&netio.LogOptions{
+				MessageParams: confirmMsg.MessageParams,
+			},
+		)
 
 		// Display what happened
 		moveName := (*attackMsg.MessageParams)["move_name"].(string)
@@ -197,6 +262,14 @@ func (bc *BattleContext) waitForMessage(msgType string) (*messages.Message, erro
 
 		// Handle spectators joining mid-battle (host only)
 		if msg.MessageType == messages.SpectatorRequest && bc.IsHost {
+			// Verbose logging for received SPECTATOR_REQUEST
+			netio.VerboseEventLog(
+				"PokeProtocol: Received SPECTATOR_REQUEST from new spectator",
+				&netio.LogOptions{
+					MS: addr.String(),
+				},
+			)
+
 			spectatorName := "Spectator" + addr.String()
 			spectator := peer.MakePD(spectatorName, nil, addr)
 			bc.Game.AddSpectator(spectator)

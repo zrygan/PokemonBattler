@@ -225,6 +225,14 @@ func RunBattle(
 					gameOverBytes := gameOverMsg.SerializeMessage()
 					selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
 
+					// Verbose logging for GAME_OVER
+					netio.VerboseEventLog(
+						"PokeProtocol: Sent GAME_OVER message to opponent",
+						&netio.LogOptions{
+							MessageParams: gameOverMsg.MessageParams,
+						},
+					)
+
 					// Send game over message according to communication mode
 					if isHost {
 						// In P2P mode, explicitly send to spectators
@@ -275,6 +283,14 @@ func RunBattle(
 							)
 							gameOverBytes := gameOverMsg.SerializeMessage()
 							selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
+
+							// Verbose logging for GAME_OVER
+							netio.VerboseEventLog(
+								"PokeProtocol: Sent GAME_OVER message to opponent",
+								&netio.LogOptions{
+									MessageParams: gameOverMsg.MessageParams,
+								},
+							)
 
 							// Send game over message according to communication mode
 							if isHost {
@@ -344,6 +360,14 @@ func RunBattle(
 			)
 			gameOverBytes := gameOverMsg.SerializeMessage()
 			selfPlayer.Peer.Conn.WriteToUDP(gameOverBytes, opponentPlayer.Peer.Addr)
+
+			// Verbose logging for GAME_OVER
+			netio.VerboseEventLog(
+				"PokeProtocol: Sent GAME_OVER message to opponent",
+				&netio.LogOptions{
+					MessageParams: gameOverMsg.MessageParams,
+				},
+			)
 
 			// Broadcast to spectators
 			if isHost {
@@ -481,6 +505,14 @@ func sendChatMessage(selfPlayer *player.Player, opponentPlayer *player.Player, g
 	)
 
 	msgBytes := msg.SerializeMessage()
+
+	// Verbose logging for CHAT_MESSAGE
+	netio.VerboseEventLog(
+		"PokeProtocol: Sent CHAT_MESSAGE",
+		&netio.LogOptions{
+			MessageParams: msg.MessageParams,
+		},
+	)
 
 	// Send chat message according to communication mode
 	switch game.CommunicationMode {

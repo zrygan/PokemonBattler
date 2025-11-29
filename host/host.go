@@ -4,7 +4,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/zrygan/pokemonbattler/game"
 	"github.com/zrygan/pokemonbattler/messages"
@@ -120,21 +122,32 @@ func main() {
 	self := peer.MakePDFromLogin("hostW")
 	defer self.Conn.Close()
 
-	// at the start say that somebody can join you
-	joiner, spectators := waitForMatch(self)
+	// Main host loop - keep hosting battles
+	for {
+		fmt.Println("\n=== HOSTING NEW BATTLE ===")
+		fmt.Println("Waiting for players to join...")
 
-	// when watchForMatch returns, initialize a handshake
-	seed := handshake(self, joiner)
+		// at the start say that somebody can join you
+		joiner, spectators := waitForMatch(self)
 
-	// set the communication for a battle
-	cmode := game.Host_setCMode(self, joiner)
+		// when watchForMatch returns, initialize a handshake
+		seed := handshake(self, joiner)
 
-	// create Host's player
-	p := game.PlayerSetUp(self)
+		// set the communication for a battle
+		cmode := game.Host_setCMode(self, joiner)
 
-	// make BattleSetup and get opponent player info
-	opponentPlayer := game.BattleSetup(p, joiner, cmode, spectators)
+		// create Host's player
+		p := game.PlayerSetUp(self)
 
-	// Start the battle with spectators
-	game.RunBattle(&p, &opponentPlayer, seed, cmode, true, spectators)
+		// make BattleSetup and get opponent player info
+		opponentPlayer := game.BattleSetup(p, joiner, cmode, spectators)
+
+		// Start the battle with spectators
+		game.RunBattle(&p, &opponentPlayer, seed, cmode, true, spectators)
+
+		// Battle ended, return to main menu
+		fmt.Println("\n=== BATTLE COMPLETED ===")
+		fmt.Println("Returning to host menu...")
+		time.Sleep(2 * time.Second)
+	}
 }
