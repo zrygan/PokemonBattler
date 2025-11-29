@@ -46,6 +46,9 @@ func (bc *BattleContext) broadcastToSpectatorsExcept(msg []byte, exceptAddr *net
 
 // ProcessTurn handles the attack, defense, and calculation phases of a turn.
 func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool) error {
+	var opponentPeer peer.PeerDescriptor
+	var moveName string
+
 	isMyTurn := (bc.IsHost && bc.Game.CurrentTurn == "host") ||
 		(!bc.IsHost && bc.Game.CurrentTurn == "joiner")
 
@@ -55,8 +58,9 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		seqNum := bc.ReliableConn.GetNextSequenceNumber()
 		attackMsg := messages.MakeAttackAnnounce(selectedMove.Name, seqNum)
 		attackMsgBytes := attackMsg.SerializeMessage()
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(attackMsgBytes, bc.OpponentAddr)
-		bc.broadcastToSpectators(attackMsgBytes)
+		// Send using proper communication mode handling
+		opponentPeer = peer.PeerDescriptor{Addr: bc.OpponentAddr}
+		bc.sendMessage(attackMsgBytes, opponentPeer)
 
 		// Verbose logging for ATTACK_ANNOUNCE
 		netio.VerboseEventLog(
@@ -110,8 +114,9 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 			seqNum,
 		)
 		calcMsgBytes := calcMsg.SerializeMessage()
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(calcMsgBytes, bc.OpponentAddr)
-		bc.broadcastToSpectators(calcMsgBytes)
+		// Send using proper communication mode handling
+		opponentPeer = peer.PeerDescriptor{Addr: bc.OpponentAddr}
+		bc.sendMessage(calcMsgBytes, opponentPeer)
 
 		// Verbose logging for CALCULATION_REPORT
 		netio.VerboseEventLog(
@@ -162,7 +167,8 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		// Send DEFENSE_ANNOUNCE
 		seqNum := bc.ReliableConn.GetNextSequenceNumber()
 		defenseMsg := messages.MakeDefenseAnnounce(seqNum)
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(defenseMsg.SerializeMessage(), bc.OpponentAddr)
+		opponentPeer = peer.PeerDescriptor{Addr: bc.OpponentAddr}
+		bc.sendMessage(defenseMsg.SerializeMessage(), opponentPeer)
 
 		// Verbose logging for sent DEFENSE_ANNOUNCE
 		netio.VerboseEventLog(
@@ -190,13 +196,44 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		damage := (*calcMsg.MessageParams)["damage_dealt"].(int)
 		defenderHPRemaining := (*calcMsg.MessageParams)["defender_hp_remaining"].(int)
 
+		// Verify calculation by doing our own calculation
+		moveName = (*attackMsg.MessageParams)["move_name"].(string)
+		opponentPokemon := getOpponentPokemon(bc)
+		move := bc.findMoveByName(opponentPokemon, moveName)
+		myDamageCalc := bc.calculateDamage(opponentPokemon, &bc.SelfPlayer.PokemonStruct, move, false, false)
+		myHPCalc := bc.SelfPlayer.PokemonStruct.HP - myDamageCalc
+		if myHPCalc < 0 {
+			myHPCalc = 0
+		}
+
+		// Create our own calculation report for verification
+		myCalcMsg := bc.makeCalculationReport(
+			opponentPokemon.Name,
+			moveName,
+			opponentPokemon.HP,
+			myDamageCalc,
+			myHPCalc,
+			0, // Temporary sequence number for verification
+		)
+
+		// Verify calculations match (RFC Section 5.2)
+		if !bc.verifyCalculations(*calcMsg, &myCalcMsg) {
+			fmt.Printf("WARNING: Calculation discrepancy detected!\n")
+			fmt.Printf("Opponent calc: %d damage, %d HP remaining\n", damage, defenderHPRemaining)
+			fmt.Printf("My calc: %d damage, %d HP remaining\n", myDamageCalc, myHPCalc)
+
+			// Send resolution request as per RFC
+			return bc.handleCalculationDiscrepancy(myCalcMsg)
+		}
+
 		// Apply damage to self
 		bc.SelfPlayer.PokemonStruct.HP = defenderHPRemaining
 
 		// Send CALCULATION_CONFIRM
 		seqNum = bc.ReliableConn.GetNextSequenceNumber()
 		confirmMsg := messages.MakeCalculationConfirm(seqNum)
-		bc.SelfPlayer.Peer.Conn.WriteToUDP(confirmMsg.SerializeMessage(), bc.OpponentAddr)
+		opponentPeer = peer.PeerDescriptor{Addr: bc.OpponentAddr}
+		bc.sendMessage(confirmMsg.SerializeMessage(), opponentPeer)
 
 		// Verbose logging for sent CALCULATION_CONFIRM
 		netio.VerboseEventLog(
@@ -207,7 +244,7 @@ func (bc *BattleContext) ProcessTurn(selectedMove poke.Move, useAttackBoost bool
 		)
 
 		// Display what happened
-		moveName := (*attackMsg.MessageParams)["move_name"].(string)
+		moveName = (*attackMsg.MessageParams)["move_name"].(string)
 		attackerName := (*calcMsg.MessageParams)["attacker"].(string)
 		fmt.Printf("\n%s used %s! Dealt %d damage.\n", attackerName, moveName, damage)
 
@@ -394,6 +431,65 @@ func (bc *BattleContext) switchTurn() {
 	} else {
 		bc.Game.CurrentTurn = "host"
 	}
+}
+
+// sendMessage sends a message according to the communication mode
+func (bc *BattleContext) sendMessage(msg []byte, target peer.PeerDescriptor) {
+	switch bc.Game.CommunicationMode {
+	case "P": // P2P mode - direct send only
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
+	case "B": // Broadcast mode - send to target and broadcast to spectators
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
+		bc.broadcastToSpectators(msg)
+	default: // Default to P2P behavior
+		bc.SelfPlayer.Peer.Conn.WriteToUDP(msg, target.Addr)
+	}
+}
+
+// verifyCalculations compares two calculation reports for discrepancy detection
+func (bc *BattleContext) verifyCalculations(msg1 messages.Message, msg2 *messages.Message) bool {
+	params1 := *msg1.MessageParams
+	params2 := *msg2.MessageParams
+
+	return params1["damage_dealt"] == params2["damage_dealt"] &&
+		params1["defender_hp_remaining"] == params2["defender_hp_remaining"]
+}
+
+// handleCalculationDiscrepancy sends a resolution request when calculations don't match
+func (bc *BattleContext) handleCalculationDiscrepancy(myCalc messages.Message) error {
+	seqNum := bc.ReliableConn.GetNextSequenceNumber()
+	params := *myCalc.MessageParams
+
+	resMsg := messages.MakeResolutionRequest(
+		params["attacker"].(string),
+		params["move_used"].(string),
+		params["damage_dealt"].(int),
+		params["defender_hp_remaining"].(int),
+		seqNum,
+	)
+
+	bc.SelfPlayer.Peer.Conn.WriteToUDP(resMsg.SerializeMessage(), bc.OpponentAddr)
+
+	// Verbose logging for RESOLUTION_REQUEST
+	netio.VerboseEventLog(
+		"PokeProtocol: Sent RESOLUTION_REQUEST due to calculation discrepancy",
+		&netio.LogOptions{
+			MessageParams: resMsg.MessageParams,
+		},
+	)
+
+	return fmt.Errorf("calculation discrepancy detected")
+}
+
+// findMoveByName finds a move by name in a Pokemon's moveset
+func (bc *BattleContext) findMoveByName(pokemon *poke.Pokemon, moveName string) poke.Move {
+	for _, move := range pokemon.Moves {
+		if move.Name == moveName {
+			return move
+		}
+	}
+	// Return a default move if not found
+	return poke.Move{Name: moveName, BasePower: 50, Type: "normal", DamageCategory: poke.Physical}
 }
 
 func getOpponentPokemon(bc *BattleContext) *poke.Pokemon {

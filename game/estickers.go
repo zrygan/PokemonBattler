@@ -12,9 +12,7 @@ import (
 	"strings"
 	"time"
 
-	_ "image/gif"  // Register GIF format
-	_ "image/jpeg" // Register JPEG format
-	_ "image/png"  // Register PNG format
+	_ "image/gif" // Register GIF format
 )
 
 const (
