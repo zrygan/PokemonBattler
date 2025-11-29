@@ -19,7 +19,6 @@ paginate: true
 - **Transport:** UDP with custom reliability layer
 - **Architecture:** P2P with Host/Joiner/Spectator roles
 - **Features:** Turn-based battles, chat, stickers, team management
-- **Total Score Target:** 125/100 points + 15 bonus points
 
 ---
 
